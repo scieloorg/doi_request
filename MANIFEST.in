@@ -1,1 +1,3 @@
+include *.txt *.ini *.cfg *.rst
+recursive-include doi_request *.ico *.png *.css *.gif *.jpg *.pt *.txt *.mak *.mako *.js *.html *.xml *.jinja2
 recursive-include xsd *.xsd

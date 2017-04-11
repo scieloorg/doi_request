@@ -7,7 +7,7 @@ from celery.utils.log import get_task_logger
 from lxml import etree
 
 from crossref.client import CrossrefClient
-from crossref.models import DepositItem
+from doi_request.models import DepositItem
 
 logger = get_task_logger(__name__)
 

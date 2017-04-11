@@ -14,9 +14,9 @@ from datetime import datetime, timedelta
 from lxml import etree
 import requests
 
-from crossref.models import DepositItem
+from doi_request.models import DepositItem
 from articlemeta.client import ThriftClient
-from crossref.tasks import register_doi, request_doi_status
+from tasks.tasks import register_doi, request_doi_status
 from crossref.client import CrossrefClient
 
 import utils
