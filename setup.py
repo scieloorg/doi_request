@@ -16,6 +16,7 @@ install_requires = [
     'pyramid_mako',
     'pyramid_debugtoolbar',
     'waitress',
+    'Babel',
     'articlemetaapi',
     'lxml',
     'mongoengine',
@@ -47,6 +48,14 @@ setup(
         "Programming Language :: Python :: 3",
     ],
     dependency_links=[],
+    message_extractors={
+        'doi_request': [
+            ('**.py', 'python', None),
+            ('templates/**.html', 'mako', None),
+            ('templates/**.mako', 'mako', None),
+            ('static/**', 'ignore', None)
+        ]
+    },
     tests_require=tests_require,
     test_suite='tests',
     install_requires=install_requires,

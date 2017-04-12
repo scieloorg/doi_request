@@ -16,7 +16,7 @@ import requests
 
 from doi_request.models import DepositItem
 from articlemeta.client import ThriftClient
-from tasks.tasks import register_doi, request_doi_status
+from tasks.celery import register_doi, request_doi_status
 from crossref.client import CrossrefClient
 
 import utils
@@ -154,7 +154,10 @@ class ExportDOI(object):
                     collection_acronym=document.collection_acronym,
                     xml_file_name=xml_file_name,
                     doi=document.doi,
-                    prefix=doi_prefix
+                    prefix=doi_prefix,
+                    submission_updated_at=datetime.now,
+                    updated_at=datetime.now,
+                    started_at=datetime.now
                 )
                 depitem.save()
                 try:
@@ -164,6 +167,8 @@ class ExportDOI(object):
                     logger.error('Fail to read document:  %s' % code)
                     depitem.xml_is_valid = False
                     depitem.submission_status = 'fail'
+                    depitem.submission_updated_at = datetime.now
+                    depitem.updated_at = datetime.now
                     depitem.save()
                     xml = ''
                     continue
@@ -175,6 +180,8 @@ class ExportDOI(object):
                     logger.error('Fail to parse xml document:  %s' % code)
                     depitem.xml_is_valid = False
                     depitem.submission_status = 'fail'
+                    depitem.submission_updated_at = datetime.now
+                    depitem.updated_at = datetime.now
                     depitem.save()
                     xml = ''
                     continue
@@ -186,9 +193,13 @@ class ExportDOI(object):
                 if doi_prefix.lower() != self.prefix.lower():
                     depitem.submission_status = 'notapplicable'
                     depitem.feedback_status = 'notapplicable'
+                    depitem.submission_updated_at = datetime.now
+                    depitem.feedback_updated_at = datetime.now
+                    depitem.updated_at = datetime.now
                     depitem.save()
                     continue
 
+                depitem.submission_updated_at = datetime.now
                 depitem.save()
 
                 logger.info('Sending document:  %s' % code)
