@@ -11,13 +11,14 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/ionicons/2.0.1/css/ionicons.min.css">
     <link rel="stylesheet" href="/static/adminlte/css/AdminLTE.min.css">
     <link rel="stylesheet" href="/static/adminlte/css/skins/_all-skins.min.css">
+    <link rel="stylesheet" href="/static/plugins/daterangepicker/daterangepicker.css">
   </head>
   <body class="hold-transition skin-blue fixed sidebar-mini">
     <!-- Site wrapper -->
     <div class="wrapper">
       <header class="main-header">
         <!-- Logo -->
-        <a href="../../index2.html" class="logo">
+        <a href="${request.route_url('list_deposits')}" class="logo">
           <span class="logo-mini">DOI</span>
           <span class="logo-lg">SciELO DOI Manager</span>
         </a>
@@ -37,27 +38,21 @@
       <aside class="main-sidebar">
         <!-- sidebar: style can be found in sidebar.less -->
         <section class="sidebar">
-          <form action="#" method="get" class="sidebar-form">
+          <form action="${request.route_url('list_deposits')}" method="get" class="sidebar-form">
             <div class="input-group">
-              <input type="text" name="q" class="form-control" placeholder="Search...">
+              <input type="text" name="query" class="form-control" placeholder="${_(u'pesquise por DOI ou PID')}">
                   <span class="input-group-btn">
-                    <button type="submit" name="search" id="search-btn" class="btn btn-flat"><i class="fa fa-search"></i>
+                    <button type="submit" id="search-btn" class="btn btn-flat"><i class="fa fa-search"></i>
                     </button>
                   </span>
             </div>
           </form>
           <!-- /.search form -->
           <ul class="sidebar-menu">
-            <li class="treeview">
-              <a href="#">
-                <i class="fa fa-dashboard"></i> <span>Dashboard</span>
-                <span class="pull-right-container">
-                  <i class="fa fa-angle-left pull-right"></i>
-                </span>
+            <li>
+              <a href="${request.route_url('list_deposits')}">
+                <i class="fa fa-cloud-upload"></i> <span> ${_(u'Depósitos')}</span>
               </a>
-              <ul class="treeview-menu">
-                <li><a href="${request.route_url('dashboard')}"><i class="fa fa-circle-o"></i> ${_(u'depósitos')}</a></li>
-              </ul>
             </li>
             <li>
               <a href="${request.route_url('help')}">
@@ -116,5 +111,9 @@
     <script src="/static/plugins/fastclick/fastclick.js"></script>
     <script src="/static/adminlte/js/app.min.js"></script>
     <script src="/static/adminlte/js/demo.js"></script>
+    <script src="/static/plugins/daterangepicker/moment.min.js"></script>
+    <script src="/static/plugins/daterangepicker/daterangepicker.js"></script>
+    <script src="/static/plugins/datepicker/bootstrap-datepicker.js"></script>
+    <%block name="footer_js" />
   </body>
 </html>

@@ -8,7 +8,7 @@ def main(global_config, **settings):
     config = Configurator(settings=settings)
     config.include('pyramid_mako')
     config.add_static_view('static', 'static', cache_max_age=3600)
-    config.add_route('dashboard', '/')
+    config.add_route('list_deposits', '/')
     config.add_route('help', '/help')
     config.add_route('deposit', '/deposit/{deposit_item_code}')
 

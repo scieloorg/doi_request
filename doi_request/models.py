@@ -21,18 +21,20 @@ class DepositItem(DynamicDocument):
     collection_acronym = StringField(max_length=23, required=True)
     xml_file_name = StringField(max_length=32, required=True)
     prefix = StringField(max_length=16)
-    doi = StringField(max_length=32)
+    doi = StringField(max_length=128)
     doi_batch_id = StringField(max_length=32)
     xml_is_valid = BooleanField(default=False)
-    submitted_xml = StringField()
-    feedback_json = StringField()
+    deposit_xml = StringField(defaulf='')
     feedback_status = StringField(max_length=16)
-    feddback_xml = StringField()
+    feedback_xml = StringField(defaulf='')
+    feedback_log = StringField(defaulf='')
     feedback_updated_at = DateTimeField()
+    feedback_request_status_code = IntField(max_length=3)
     submission_status = StringField(max_length=16, choices=SUBMISSION_STATUS)
     submission_status_code = IntField(max_length=3)
     submission_updated_at = DateTimeField()
-    submission_response = StringField()
+    submission_response = StringField(defaulf='')
+    submission_log = StringField(defaulf='')
     updated_at = DateTimeField(default=datetime.now)
     started_at = DateTimeField(default=datetime.now)
 
@@ -52,37 +54,30 @@ class DepositItem(DynamicDocument):
     @property
     def timeline(self):
 
-        timeline = [
-            (self.started_at, 'started', 'fa-info', 'gray', 'Iniciado processo de requisição de DOI e/ou atualização de metadados no Crossref.')
-        ]
-
         if self.submission_status == 'notapplicable':
             return [
-                (self.started_at, 'notapplicable', 'fa-info', 'gray', 'XML não enviado, provavelmente pelo Prefixo do DOI não estar vinculado ao prefixo desta coleção')
+                (self.started_at, 'notapplicable', 'fa-info', 'gray', self.submission_log)
             ]
 
-        submission = (self.submission_updated_at, self.submission_status, 'fa-industry', 'orange', 'Produzindo XML para envío')
+        timeline = []
+        submission = (self.submission_updated_at, self.submission_status, 'fa-industry', 'orange', self.submission_log)
         if self.feedback_status == 'waiting':
-            submission = (self.submission_updated_at, self.submission_status, 'fa-spinner', 'orange', 'XML esta na fila de envío para Crossref')
+            submission = (self.submission_updated_at, self.submission_status, 'fa-spinner', 'orange', self.submission_log)
         if self.submission_status == 'success':
-            submission = (self.submission_updated_at, self.submission_status, 'fa-envelope', 'green', 'XML enviado para Crossref')
+            submission = (self.submission_updated_at, self.submission_status, 'fa-envelope', 'green', self.submission_log)
         elif self.submission_status == 'error':
-            submission = (self.submission_updated_at, self.submission_status, 'fa-thumbs-down', 'red', 'XML não enviado ao Crossref, processo interrompido')
-            return timeline.append(submission)
+            submission = (self.submission_updated_at, self.submission_status, 'fa-thumbs-down', 'red', self.submission_log)
         timeline.append(submission)
 
-        feedback = (self.feedback_updated_at, self.feedback_status, 'fa-spinner', 'orange', 'XML aguardando recebimento no Crossref')
+        feedback = None
         if self.feedback_status == 'waiting':
-            feedback = (self.feedback_updated_at, self.feedback_status, 'fa-spinner', 'orange', 'XML recebido pelo crossref, em processo de avaliação')
+            feedback = (self.feedback_updated_at, self.feedback_status, 'fa-spinner', 'orange', self.feedback_log)
         elif self.feedback_status == 'success':
-            feedback = (self.submission_updated_at, self.feedback_status, 'fa-thumbs-up', 'green', 'DOI Registrado')
+            feedback = (self.submission_updated_at, self.feedback_status, 'fa-thumbs-up', 'green', self.feedback_log)
         elif self.feedback_status == 'error':
-            feedback = (self.submission_updated_at, self.feedback_status, 'fa-thumbs-down', 'red', 'DOI não registrado, processo interrompido')
-            return timeline.append(feedback)
-        timeline.append(feedback)
+            feedback = (self.submission_updated_at, self.feedback_status, 'fa-thumbs-down', 'red', self.feedback_log)
 
-        timeline.append(
-            (self.updated_at, 'updated', 'fa-info', 'gray', 'Data da última atualização.')
-        )
+        if feedback:
+            timeline.append(feedback)
 
         return timeline
