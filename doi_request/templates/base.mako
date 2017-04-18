@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="/static/adminlte/css/AdminLTE.min.css">
     <link rel="stylesheet" href="/static/adminlte/css/skins/_all-skins.min.css">
     <link rel="stylesheet" href="/static/plugins/daterangepicker/daterangepicker.css">
+    <%block name="stylesheet" />
   </head>
   <body class="hold-transition skin-blue fixed sidebar-mini">
     <!-- Site wrapper -->
@@ -40,7 +41,7 @@
         <section class="sidebar">
           <form action="${request.route_url('list_deposits')}" method="get" class="sidebar-form">
             <div class="input-group">
-              <input type="text" name="query" class="form-control" placeholder="${_(u'pesquise por DOI ou PID')}">
+              <input type="text" name="pid_doi" class="form-control" placeholder="${_(u'pesquise por DOI ou PID')}">
                   <span class="input-group-btn">
                     <button type="submit" id="search-btn" class="btn btn-flat"><i class="fa fa-search"></i>
                     </button>

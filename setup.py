@@ -9,6 +9,8 @@ with open(os.path.join(here, 'README.rst')) as f:
 with open(os.path.join(here, 'CHANGES.txt')) as f:
     CHANGES = f.read()
 
+VERSION = '1.0.0'
+
 install_requires = [
     'thriftpy==0.3.1',
     'requests==2.11.1',
@@ -20,7 +22,9 @@ install_requires = [
     'articlemetaapi',
     'lxml',
     'mongoengine',
-    'celery'
+    'celery',
+    'SQLAlchemy',
+    'zope.sqlalchemy'
 ]
 
 tests_require = [
@@ -32,7 +36,7 @@ tests_require = [
 
 setup(
     name="doi_request",
-    version="0.1.0",
+    version=VERSION,
     description="Tool to manage the DOI registering process",
     long_description=README + '\n\n' + CHANGES,
     author="SciELO",
@@ -69,7 +73,8 @@ setup(
             'main = doi_request:main',
         ],
         'console_scripts': [
-            'processing_export_doi = processing.exportDOI:main'
+            'processing_export_doi = processing.exportDOI:main',
+            'initialize_db = initializedb:main'
         ]
     },
 )

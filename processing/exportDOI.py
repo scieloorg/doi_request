@@ -8,24 +8,19 @@ import logging
 import logging.config
 import codecs
 import json
-from io import BytesIO, StringIO
+
 from datetime import datetime, timedelta
 
-from lxml import etree
-import requests
-
-from doi_request.models import DepositItem
 from articlemeta.client import ThriftClient
-from tasks.celery import register_doi, request_doi_status
-from crossref.client import CrossrefClient
+
+from doi_request.depositor import Depositor
 
 import utils
 
+logger = logging.getLogger(__name__)
+
 FROM = datetime.now() - timedelta(days=30)
 FROM = FROM.isoformat()[:10]
-
-CROSSREF_XSD = open(os.path.dirname(__file__)+'/../xsd/crossref4.4.0.xsd')
-logger = logging.getLogger(__name__)
 
 SENTRY_HANDLER = os.environ.get('SENTRY_HANDLER', None)
 LOGGING_LEVEL = os.environ.get('LOGGING_LEVEL', 'DEBUG')
@@ -52,8 +47,12 @@ LOGGING = {
             'handlers': ['console'],
             'level': LOGGING_LEVEL,
             'propagate': False,
-            },
+        },
         'processing.exportDOI': {
+            'level': LOGGING_LEVEL,
+            'propagate': True,
+        },
+        'doi_request': {
             'level': LOGGING_LEVEL,
             'propagate': True,
         },
@@ -76,153 +75,13 @@ class ExportDOI(object):
                  depositor_email=None, test_mode=False):
 
         self._articlemeta = ThriftClient(domain=os.environ.get('ARTICLEMETA_THRIFTSERVER', 'articlemeta.scielo.org:11621'))
+        self._depositor = Depositor(prefix=prefix, api_user=api_user, api_key=api_key, depositor_name=depositor_name, depositor_email=depositor_email, test_mode=test_mode)
         self.collection = collection
         self.from_date = from_date
-        self.prefix = prefix
-        self.api_user = api_user
-        self.api_key = api_key
-        self.depositor_name = depositor_name
-        self.depositor_email = depositor_email
         self.issns = issns or [None]
-        self.test_mode = test_mode
-        self._parse_schema()
-
-    def _parse_schema(self):
-
-        try:
-            sch_doc = etree.parse(CROSSREF_XSD)
-            sch = etree.XMLSchema(sch_doc)
-        except Exception as e:
-            logger.exception(e)
-            logger.error('Fail to parse XML')
-            return False
-
-        self.crossref_schema = sch
-
-    def _setup_depositor(self, xml):
-
-        if self.depositor_name:
-            registrant = xml.find('//{http://www.crossref.org/schema/4.4.0}registrant')
-            registrant.text = self.depositor_name
-
-            depositor_name = xml.find('//{http://www.crossref.org/schema/4.4.0}depositor_name')
-            depositor_name.text = self.depositor_name
-
-        if self.depositor_email:
-            depositor_email = xml.find('//{http://www.crossref.org/schema/4.4.0}email_address')
-            depositor_email.text = self.depositor_email
-
-        return xml
-
-    def xml_is_valid(self, xml):
-
-        try:
-            xml = BytesIO(xml.encode('utf-8'))
-            xml_doc = etree.parse(xml)
-            xml_doc = self._setup_depositor(xml_doc)
-            logger.debug('XML is well formed')
-        except Exception as e:
-            logger.exception(e)
-            logger.error('Fail to parse XML')
-            return False
-
-        try:
-            result = self.crossref_schema.assertValid(xml_doc)
-            logger.debug('XML is valid')
-            return xml_doc
-        except Exception as e:
-            logger.exception(e)
-            logger.error('Fail to parse XML')
-            return False
-
-    def deposit(self, document):
-
-        code = '_'.join([document.collection_acronym, document.publisher_id])
-        msg = 'Reading document: %s' % code
-        logger.info(msg)
-        xml_file_name = '%s.xml' % code
-        doi_prefix = document.doi.split('/')[0] if document.doi else ''
-        now = datetime.now()
-        depitem = DepositItem(
-            code=code,
-            pid=document.publisher_id,
-            collection_acronym=document.collection_acronym,
-            xml_file_name=xml_file_name,
-            doi=document.doi,
-            prefix=doi_prefix,
-            submission_updated_at=now,
-            submission_status='waiting',
-            submission_log=msg,
-            updated_at=now,
-            started_at=now
-        )
-        depitem.save()
-
-        if doi_prefix.lower() != self.prefix.lower():
-            now = datetime.now()
-            msg = 'Document DOI prefix (%s) do no match with the collection prefix (%s)' % (doi_prefix, self.prefix)
-            depitem.submission_status = 'notapplicable'
-            depitem.submission_log = msg
-            depitem.feedback_status = 'notapplicable'
-            depitem.feddback_log = msg
-            depitem.submission_updated_at = now
-            depitem.feedback_updated_at = now
-            depitem.updated_at = now
-            depitem.save()
-            return
-
-        try:
-            xml = self._articlemeta.document(document.publisher_id, document.collection_acronym, fmt='xmlcrossref')
-        except Exception as exc:
-            logger.exception(exc)
-            now = datetime.now()
-            msg = 'Fail to read document:  %s' % code
-            logger.error(msg)
-            depitem.xml_is_valid = False
-            depitem.submission_log = msg
-            depitem.submission_status = 'fail'
-            depitem.submission_updated_at = now
-            depitem.updated_at = now
-            depitem.save()
-            xml = ''
-            return
-
-        parsed_xml = self.xml_is_valid(xml)
-        depitem.deposit_xml = etree.tostring(parsed_xml).decode('utf-8')
-
-        if parsed_xml is False:
-            msg = 'XML is invalid, fail to parse xml for document (%s)' % code
-            now = datetime.now()
-            logger.error(msg)
-            depitem.xml_is_valid = False
-            depitem.submission_log = msg
-            depitem.submission_status = 'fail'
-            depitem.submission_updated_at = now
-            depitem.updated_at = now
-            depitem.save()
-            xml = ''
-            return
-
-        msg = 'XML is valid, it will be submitted to Crossref'
-        now = datetime.now()
-        logger.info(msg)
-        depitem.xml_is_valid = True
-        depitem.submission_status = 'waiting'
-        doi_batch_id = parsed_xml.find('//{http://www.crossref.org/schema/4.4.0}doi_batch_id').text
-        depitem.doi_batch_id = doi_batch_id
-        depitem.submission_log = msg
-        depitem.submission_updated_at = now
-        depitem.updated_at = now
-        depitem.save()
-
-        register_doi.apply_async(
-            (code, xml),
-            link=request_doi_status.s(doi_batch_id)
-        )
 
     def run(self):
 
-        crossref_client = CrossrefClient(self.prefix, self.api_user, self.api_key, self.test_mode)
         count = 0
         for issn in self.issns:
             for document in self._articlemeta.documents(
@@ -230,10 +89,10 @@ class ExportDOI(object):
                     from_date=self.from_date):
 
                 count += 1
-                if count >= 30:
+                if count >= 500:
                     break
 
-                self.deposit(document)
+                self._depositor.deposit(document)
 
 
 def main():

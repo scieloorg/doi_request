@@ -1,5 +1,9 @@
 <%inherit file="base.mako"/>
 
+<%block name="stylesheet">
+  <link rel="stylesheet" href="/static/codemirror/css/codemirror.css">
+</%block>
+
 <%block name="central_container">
 <div class="nav-tabs-custom">
   <ul class="nav nav-tabs">
@@ -29,7 +33,7 @@
         </div>
         <div class="col-md-4 col-sm-8 col-xs-16">
           <strong>${_(u'Situação de depósito')}</strong>
-          <p><span class="label label-${submission_status_to_template[deposit.feedback_status or 'unknow']}">${deposit.feedback_status or 'unknow'}</span></p>
+          <p><span class="label label-${feedback_status_to_template[deposit.feedback_status or 'unknow']}">${deposit.feedback_status or 'unknow'}</span></p>
           <strong>${_(u'Atualizado em')}</strong>
           <p>${deposit.feedback_updated_at}</p>
         </div>
@@ -94,7 +98,7 @@
       <strong>${_(u'Resposta da submissão')}</strong>
       <p>${deposit.submission_response}</p>
       <strong>${_(u'XML de depósito')}</strong>
-      <p>${deposit.deposit_xml}</p>
+      <p><textarea class="form-control" rows="30" id="deposit_xml">${deposit.deposit_xml}</textarea></p>
     </div>
     <div id="deposit_details" class="tab-pane">
       <strong>${_(u'Log do depósito')}</strong>
@@ -104,8 +108,17 @@
       <strong>${_(u'Código HTTP de verificação da situação do depósito')}</strong>
       <p>${deposit.feedback_request_status_code}</p>
       <strong>${_(u'XML de resultado do depósito')}</strong>
-      <p>${deposit.feedback_xml}</p>
+      <p><textarea class="form-control" rows="30" id="feedback_xml">${deposit.feedback_xml}</textarea></p>
     </div>
   </div>
 </div>
+</%block>
+
+<%block name="footer_js">
+  <script src="/static/codemirror/js/codemirror.js"></script>
+  <script src="/static/codemirror/mode/xml/xml.js"></script>
+  <script source="javascript">
+    var myCodeMirror_feedback = CodeMirror.fromTextArea(document.getElementById("feedback_xml"));
+    var myCodeMirror_deposit = CodeMirror.fromTextArea(document.getElementById("deposit_xml"));
+  </script>
 </%block>

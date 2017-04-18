@@ -11,5 +11,6 @@ FEEDBACK_STATUS_TO_TEMPLATE = {
     'error': 'danger',
     'success': 'success',
     'unknow': 'default',
+    'failure': 'danger',
     'notapplicable': 'default'
 }
