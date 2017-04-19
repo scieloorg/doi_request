@@ -1,9 +1,5 @@
 <%inherit file="base.mako"/>
 
-<%block name="stylesheet">
-  <link rel="stylesheet" href="/static/codemirror/css/codemirror.css">
-</%block>
-
 <%block name="central_container">
 <div class="nav-tabs-custom">
   <ul class="nav nav-tabs">
@@ -27,13 +23,13 @@
         </div>
         <div class="col-md-4 col-sm-8 col-xs-16">
           <strong>${_(u'Situação de submissão')}</strong>
-          <p><span class="label label-${submission_status_to_template[deposit.submission_status or 'unknow']}">${deposit.submission_status or 'unknow'}</span></p>
+          <p><span class="label label-${status_to_template[deposit.submission_status or 'unknow'][0]}">${deposit.submission_status or 'unknow'}</span></p>
           <strong>${_(u'Atualizado em')}</strong>
           <p>${deposit.submission_updated_at}</p>
         </div>
         <div class="col-md-4 col-sm-8 col-xs-16">
           <strong>${_(u'Situação de depósito')}</strong>
-          <p><span class="label label-${feedback_status_to_template[deposit.feedback_status or 'unknow']}">${deposit.feedback_status or 'unknow'}</span></p>
+          <p><span class="label label-${status_to_template[deposit.feedback_status or 'unknow'][0]}">${deposit.feedback_status or 'unknow'}</span></p>
           <strong>${_(u'Atualizado em')}</strong>
           <p>${deposit.feedback_updated_at}</p>
         </div>
@@ -58,17 +54,22 @@
               </h3>
             </div>
           </li>
-        % for event_date, event_status, event_icon, event_signal, event_message in timeline:
+        % for event in deposit.timeline:
           <li>
-            <i class="fa ${event_icon} bg-${event_signal}"></i>
+            <i class="fa ${status_to_template[event.status or 'unknow'][2]} bg-${status_to_template[event.status or 'unknow'][1]}"></i>
             <div class="timeline-item">
               <span class="time">
                 <i class="fa fa-clock-o"></i>
-                ${event_date}
+                ${event.date}
               </span>
               <h3 class="timeline-header">
-                ${event_message}
+                (${event.type}) ${event.title}
               </h3>
+              % if event.body:
+                <div class="timeline-body">
+                  ${event.body}
+                </div>
+              % endif
             </div>
           </li>
         % endfor
@@ -87,28 +88,18 @@
       </ul>
     </div>
     <div class="tab-pane" id="submission_details">
-      <strong>${_(u'Log da submissão')}</strong>
-      <p>${deposit.submission_log}</p>
       <strong>${_(u'XML é válido')}</strong>
-      <p>${deposit.xml_is_valid}</p>
+      <p>${deposit.is_xml_valid}</p>
       <strong>${_(u'Situação da submissão')}</strong>
       <p>${deposit.submission_status}</p>
-      <strong>${_(u'Código HTTP de situação da submissão')}</strong>
-      <p>${deposit.submission_status_code}</p>
-      <strong>${_(u'Resposta da submissão')}</strong>
-      <p>${deposit.submission_response}</p>
       <strong>${_(u'XML de depósito')}</strong>
-      <p><textarea class="form-control" rows="30" id="deposit_xml">${deposit.deposit_xml}</textarea></p>
+      <p><textarea class="form-control" id="submission_xml">${deposit.submission_xml}</textarea></p>
     </div>
     <div id="deposit_details" class="tab-pane">
-      <strong>${_(u'Log do depósito')}</strong>
-      <p>${deposit.submission_log}</p>
       <strong>${_(u'Situação do depósito')}</strong>
       <p>${deposit.feedback_status}</p>
-      <strong>${_(u'Código HTTP de verificação da situação do depósito')}</strong>
-      <p>${deposit.feedback_request_status_code}</p>
       <strong>${_(u'XML de resultado do depósito')}</strong>
-      <p><textarea class="form-control" rows="30" id="feedback_xml">${deposit.feedback_xml}</textarea></p>
+      <p><textarea class="form-control" id="feedback_xml">${deposit.feedback_xml}</textarea></p>
     </div>
   </div>
 </div>
@@ -118,7 +109,23 @@
   <script src="/static/codemirror/js/codemirror.js"></script>
   <script src="/static/codemirror/mode/xml/xml.js"></script>
   <script source="javascript">
-    var myCodeMirror_feedback = CodeMirror.fromTextArea(document.getElementById("feedback_xml"));
-    var myCodeMirror_deposit = CodeMirror.fromTextArea(document.getElementById("deposit_xml"));
+    var myCodeMirror_submission = CodeMirror.fromTextArea(document.getElementById("submission_xml"), {
+      mode: 'application/xml',
+      lineNumbers: true,
+      lineWrapping: true,
+      readOnly: true,
+    });
+    var myCodeMirror_feedback = CodeMirror.fromTextArea(document.getElementById("feedback_xml"),{
+      mode: 'application/xml',
+      lineNumbers: true,
+      lineWrapping: true,
+      readOnly: true
+    });
+    $(function() {
+      $('a[data-toggle="tab"]').on('shown.bs.tab', function(){
+        myCodeMirror_submission.refresh();
+        myCodeMirror_feedback.refresh();
+      });
+    });
   </script>
 </%block>

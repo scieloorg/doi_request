@@ -23,8 +23,7 @@ install_requires = [
     'lxml',
     'mongoengine',
     'celery',
-    'SQLAlchemy',
-    'zope.sqlalchemy'
+    'SQLAlchemy'
 ]
 
 tests_require = [
@@ -73,8 +72,7 @@ setup(
             'main = doi_request:main',
         ],
         'console_scripts': [
-            'processing_export_doi = processing.exportDOI:main',
-            'initialize_db = initializedb:main'
+            'processing_export_doi = processing.exportDOI:main'
         ]
     },
 )

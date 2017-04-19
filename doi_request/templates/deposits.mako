@@ -1,7 +1,7 @@
 <%inherit file="base.mako"/>
 
 <%block name="central_container">
-  <div class="box box-primary collapsed-box">
+  <div class="box box-primary">
     <div class="box-header with-border">
       <h3 class="box-title">${_('Filtros')}</h3>
       <div class="box-tools pull-right">
@@ -12,10 +12,19 @@
     <div class="box-body">
       <form name="filter" action="${request.route_url('list_deposits')}" method="get">
         <div class="form-group">
+          <label>${_(u'Situação de submissão')}</label>
+          <select name="submission_status" class="form-control">
+            <option value="" ${'selected' if filter_submission_status == '' else ''}>${_(u'todos')}</option>
+            % for item in status_to_template:
+              <option value="${item}" ${'selected' if filter_submission_status == item else ''}>${item}</option>
+            % endfor
+          </select>
+        </div>
+        <div class="form-group">
           <label>${_(u'Situação de depósito')}</label>
           <select name="feedback_status" class="form-control">
-            <option value="all" ${'selected' if filter_feedback_status == 'all' else ''}>${_(u'todos')}</option>
-            % for item in feedback_status_to_template:
+            <option value="" ${'selected' if filter_feedback_status == '' else ''}>${_(u'todos')}</option>
+            % for item in status_to_template:
               <option value="${item}" ${'selected' if filter_feedback_status == item else ''}>${item}</option>
             % endfor
           </select>
@@ -72,10 +81,10 @@
               <td>${item.started_at}</td>
               <td><a href="${request.route_url('deposit', deposit_item_code=item.code)}">${item.code}</a></td>
               <td>
-                <span class="label label-${submission_status_to_template[item.submission_status or 'unknow']}">${item.submission_status or 'unknow'}</span>
+                <span class="label label-${status_to_template[item.submission_status or 'unknow'][0]}">${item.submission_status}</span>
               </td>
               <td>
-                <span class="label label-${feedback_status_to_template[item.feedback_status or 'unknow']}">${item.feedback_status or 'unknow'}</span>
+                <span class="label label-${status_to_template[item.feedback_status or 'unknow'][0]}">${item.feedback_status or ''}</span>
               </td>
               <td>
               <a href="${request.route_url('deposit', deposit_item_code=item.code)}">

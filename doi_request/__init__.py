@@ -1,10 +1,11 @@
+import os
 from pyramid.config import Configurator
 from pyramid.session import SignedCookieSessionFactory
 
-from sqlalchemy import engine_from_config
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from setup import VERSION
+from doi_request.models import initialize_sql
 
 
 def db(request):
@@ -28,7 +29,8 @@ def main(global_config, **settings):
     config = Configurator(settings=settings)
 
     # Database Config
-    engine = engine_from_config(settings, prefix='sqlalchemy.')
+    engine = create_engine(os.environ.get('SQL_ALCHEMY', 'sqlite:///:memory:'))
+
     config.registry.dbmaker = sessionmaker(bind=engine)
     config.scan('doi_request.models')  # the "important" line
     initialize_sql(engine)
@@ -46,7 +48,6 @@ def main(global_config, **settings):
     config.add_subscriber('doi_request.subscribers.add_localizer',
                           'pyramid.events.NewRequest')
     config.add_translation_dirs('doi_request:locale')
-
 
     # Session config
     navegation_session_factory = SignedCookieSessionFactory('sses_navegation')

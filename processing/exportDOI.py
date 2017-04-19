@@ -8,13 +8,14 @@ import logging
 import logging.config
 import codecs
 import json
-
 from datetime import datetime, timedelta
 
 from articlemeta.client import ThriftClient
+from pyramid.config import Configurator
+from sqlalchemy import create_engine
+from doi_request.models import initialize_sql
 
 from doi_request.depositor import Depositor
-
 import utils
 
 logger = logging.getLogger(__name__)
@@ -67,6 +68,10 @@ if SENTRY_HANDLER:
     }
     LOGGING['loggers']['']['handlers'].append('sentry')
 
+# Database Config
+engine = create_engine(os.environ.get('SQL_ALCHEMY', 'sqlite:///:memory:'))
+initialize_sql(engine)
+
 
 class ExportDOI(object):
 
@@ -89,7 +94,7 @@ class ExportDOI(object):
                     from_date=self.from_date):
 
                 count += 1
-                if count >= 500:
+                if count >= 50:
                     break
 
                 self._depositor.deposit(document)

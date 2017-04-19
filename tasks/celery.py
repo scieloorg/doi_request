@@ -9,7 +9,9 @@ from celery.utils.log import get_task_logger
 from lxml import etree
 
 from crossref.client import CrossrefClient
-from doi_request.models import DepositItem
+from doi_request.models.depositor import Deposit
+from doi_request.models import initialize_sql
+from sqlalchemy import create_engine
 
 logger = get_task_logger(__name__)
 
@@ -43,9 +45,14 @@ REQUEST_DOI_DELAY_RETRY = 60
 REGISTER_DOI_DELAY_RETRY_TD = timedelta(seconds=REGISTER_DOI_DELAY_RETRY)
 REQUEST_DOI_DELAY_RETRY_TD = timedelta(seconds=REQUEST_DOI_DELAY_RETRY)
 
+# Database Config
+engine = create_engine(os.environ.get('SQL_ALCHEMY', 'sqlite:///:memory:'))
+initialize_sql(engine)
+
+
 @app.task(bind=True, default_retry_delay=REGISTER_DOI_DELAY_RETRY, retry_kwargs={'max_retries': 100})
 def register_doi(self, code, xml):
-    deposit_item = DepositItem.objects(pk=code)[0]
+    deposit_item = Deposit.objects(pk=code)[0]
     attempts = 0
 
     try:
@@ -103,7 +110,7 @@ def register_doi(self, code, xml):
 @app.task(bind=True, default_retry_delay=REQUEST_DOI_DELAY_RETRY, retry_kwargs={'max_retries': 200})
 def request_doi_status(self, deposit, doi_batch_id):
     is_doi_register_submitted, code = deposit
-    deposit_item = DepositItem.objects(pk=code)[0]
+    deposit_item = Deposit.objects(pk=code)[0]
 
     if is_doi_register_submitted is False:
         return False
