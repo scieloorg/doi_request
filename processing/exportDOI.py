@@ -15,7 +15,7 @@ from pyramid.config import Configurator
 from sqlalchemy import create_engine
 from doi_request.models import initialize_sql
 
-from doi_request.depositor import Depositor
+from doi_request.controller import Depositor
 import utils
 
 logger = logging.getLogger(__name__)

@@ -31,9 +31,24 @@
         <nav class="navbar navbar-static-top">
           <div class="navbar-custom-menu">
             <ul class="nav navbar-nav">
-              <!-- Control Sidebar Toggle Button -->
-              <li>
-                <a href="#" data-toggle="control-sidebar"><i class="fa fa-gears"></i></a>
+              <li class="dropdown messages-menu">
+                <a href="#" class="dropdown-toggle" data-toggle="dropdown" aria-expanded="false">
+                  <i class="fa fa-gears"></i>
+                </a>
+                <ul class="dropdown-menu">
+                  <li class="header">Settings</li>
+                  <li>
+                  <li class="content"><!-- start message -->
+                      <dt>${_(u'Prefixo no Crossref')}</dt>
+                      <dd>${crossref_prefix}</dd>
+                      <dt>${_(u'Usuário no Crossref')}</dt>
+                      <dd>${crossref_user_api}</dd>
+                      <dt>${_(u'Nome do depositante')}</dt>
+                      <dd>${crossref_depositor_name}</dd>
+                      <dt>${_(u'E-mail do depositante')}</dt>
+                      <dd>${crossref_depositor_email}</dd>
+                  </li>
+                </ul>
               </li>
             </ul>
           </div>
@@ -83,31 +98,6 @@
           </div>
         <strong>SciELO DOI Manager</strong>
       </footer>
-      <!-- Control Sidebar -->
-      <aside class="control-sidebar control-sidebar-dark">
-        <!-- Create the tabs -->
-        <!-- Tab panes -->
-        <div class="tab-content">
-          <!-- Home tab content -->
-          <div class="tab-pane" id="control-sidebar-home-tab">
-              <h3 class="control-sidebar-heading">General Settings</h3>
-              <div class="form-group">
-                <label class="control-sidebar-subheading">
-                  Report panel usage
-                  <input type="checkbox" class="pull-right" checked>
-                </label>
-                <p>
-                  Some information about this general settings option
-                </p>
-              </div> 
-          </div>
-          <!-- /.tab-pane -->
-        </div>
-      </aside>
-      <!-- /.control-sidebar -->
-      <!-- Add the sidebar's background. This div must be placed
-           immediately after the control sidebar -->
-      <div class="control-sidebar-bg"></div>
     </div>
     <!-- ./wrapper -->
     <script src="/static/plugins/jQuery/jquery-2.2.3.min.js"></script>

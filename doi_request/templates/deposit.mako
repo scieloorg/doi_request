@@ -13,9 +13,11 @@
       <div class="row">
         <div class="col-md-4 col-sm-8 col-xs-16">
           <strong>DOI</strong>
-          <p><a href="https://doi.org/${deposit.doi}" target="_blank">https://doi.org/${deposit.doi}</a></p>
+          <p><a href="https://doi.org/${deposit.doi}" target="_blank">https://doi.org/${deposit.doi or ''}</a></p>
           <strong>DOI BATCH ID</strong>
           <p>${deposit.doi_batch_id}</p>
+          <strong>${_(u'Periódico')}</strong>
+          <p>${deposit.journal}</p>
           <strong>${_(u'Iniciado em')}</strong>
           <p>${deposit.started_at}</p>
           <strong>${_(u'Atualizado em')}</strong>
@@ -32,6 +34,13 @@
           <p><span class="label label-${status_to_template[deposit.feedback_status or 'unknow'][0]}">${deposit.feedback_status or 'unknow'}</span></p>
           <strong>${_(u'Atualizado em')}</strong>
           <p>${deposit.feedback_updated_at}</p>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-md-12 col-sm-24 col-xs-48">
+          <a href="${request.route_url('post_deposit', deposit_item_code=deposit.code)}">
+            <button type="button" class="btn btn-primary btn-sm pull-right"><i class="fa fa-cloud-upload"></i> ${_(u'resubmeter')}</button>
+          </a>
         </div>
       </div>
     </div>
@@ -73,18 +82,6 @@
             </div>
           </li>
         % endfor
-          <li>
-            <i class="fa fa-info bg-default"></i>
-            <div class="timeline-item">
-              <span class="time">
-                <i class="fa fa-clock-o"></i>
-                ${deposit.updated_at}
-              </span>
-              <h3 class="timeline-header">
-                ${_('Data da última atualização')}
-              </h3>
-            </div>
-          </li>
       </ul>
     </div>
     <div class="tab-pane" id="submission_details">

@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 from datetime import timedelta
 
@@ -14,7 +15,7 @@ from doi_request.models import DBSession
 from doi_request import template_choices
 from doi_request import controller
 
-depositor = controller.depositor()
+depositor = controller.Depositor()
 LIMIT = 100
 
 
@@ -30,6 +31,8 @@ def list_deposits(request):
     pid_doi = request.GET.get('pid_doi', None)
     submission_status = request.GET.get('submission_status', None)
     feedback_status = request.GET.get('feedback_status', None)
+    issn = request.GET.get('issn', None)
+    prefix = request.GET.get('prefix', None)
     feedback_start_range = request.GET.get('feedback_start_range', default_date_range)
     offset = int(request.GET.get('offset', 0))
 
@@ -46,6 +49,10 @@ def list_deposits(request):
             deposits = deposits.filter(Deposit.feedback_status == feedback_status)
         if submission_status:
             deposits = deposits.filter(Deposit.submission_status == submission_status)
+        if issn:
+            deposits = deposits.filter(Deposit.issn == issn)
+        if prefix:
+            deposits = deposits.filter(Deposit.prefix == prefix)
 
     total = deposits.count()
     deposits = deposits.order_by(desc('started_at')).limit(LIMIT).offset(offset)
@@ -57,9 +64,15 @@ def list_deposits(request):
     data['filter_to_date'] = to_date
     data['filter_feedback_status'] = feedback_status
     data['filter_submission_status'] = submission_status
+    data['filter_issn'] = issn
+    data['filter_prefix'] = prefix
     data['offset'] = offset
     data['limit'] = LIMIT
     data['total'] = total
+    data['crossref_prefix'] = os.environ.get('CROSSREF_PREFIX', 'não definido')
+    data['crossref_user_api'] = os.environ.get('CROSSREF_API_USER', 'não definido')
+    data['crossref_depositor_name'] = os.environ.get('CROSSREF_DEPOSITOR_NAME', 'não definido')
+    data['crossref_depositor_email'] = os.environ.get('CROSSREF_DEPOSITOR_EMAIL', 'não definido')
 
     return data
 
@@ -79,6 +92,10 @@ def deposit(request):
     data['deposit'] = deposit
     data['timeline'] = deposit.timeline
     data['status_to_template'] = template_choices.STATUS_TO_TEMPLATE
+    data['crossref_prefix'] = os.environ.get('CROSSREF_PREFIX', 'não definido')
+    data['crossref_user_api'] = os.environ.get('CROSSREF_API_USER', 'não definido')
+    data['crossref_depositor_name'] = os.environ.get('CROSSREF_DEPOSITOR_NAME', 'não definido')
+    data['crossref_depositor_email'] = os.environ.get('CROSSREF_DEPOSITOR_EMAIL', 'não definido')
 
     return data
 
@@ -98,10 +115,11 @@ def help(request):
 
     locale = request.GET.get('_LOCALE_', request.locale_name)
 
-    deposits = DepositItem.objects()
-
     data = {}
     data['locale'] = locale
-    data['deposits'] = deposits
+    data['crossref_prefix'] = os.environ.get('CROSSREF_PREFIX', 'não definido')
+    data['crossref_user_api'] = os.environ.get('CROSSREF_API_USER', 'não definido')
+    data['crossref_depositor_name'] = os.environ.get('CROSSREF_DEPOSITOR_NAME', 'não definido')
+    data['crossref_depositor_email'] = os.environ.get('CROSSREF_DEPOSITOR_EMAIL', 'não definido')
 
     return data

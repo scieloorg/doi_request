@@ -12,6 +12,14 @@
     <div class="box-body">
       <form name="filter" action="${request.route_url('list_deposits')}" method="get">
         <div class="form-group">
+          <label>${_(u'ISSN')}</label>
+            <input name="issn" type="text" class="form-control" value="${filter_issn or ''}"></input>
+        </div>
+        <div class="form-group">
+          <label>${_(u'Prefix')}</label>
+            <input name="prefix" type="text" class="form-control" value="${filter_prefix or ''}"></input>
+        </div>
+        <div class="form-group">
           <label>${_(u'Situação de submissão')}</label>
           <select name="submission_status" class="form-control">
             <option value="" ${'selected' if filter_submission_status == '' else ''}>${_(u'todos')}</option>
@@ -63,12 +71,46 @@
       </div>
     </div>
     <div class="box-body">
+      <div class="row">
+        <div class="col-sm-4">
+          ${_(u'mostrando')} ${offset+1} ${_(u'a')} ${offset + limit} ${_(u'de')} ${ total } ${_(u'itens')}
+        </div>
+        <div class="col-sm-8">
+          <ul class="pagination pull-right">
+            % if offset > 0:
+              <li class="paginate_button previous">
+                <a href="/?offset=${offset-limit}">Previous</a>
+              </li>
+            % else:
+              <li class="paginate_button previous disabled">
+                <a href="#">Previous</a>
+              </li>
+            % endif
+            % for offset_item in range(offset, total, limit)[0:4]:
+            <li class="paginate_button previous">
+              <a href="/?offset=${offset_item}">${int((offset_item/limit)+1)}</a>
+            </li>
+            % endfor
+            % if offset+limit <= total:
+              <li class="paginate_button next" id="example2_next">
+                <a href="/?offset=${offset+limit}">Next</a>
+              </li>
+            % else:
+              <li class="paginate_button next disabled">
+                <a href="#">Next</a>
+              </li>
+            % endif
+          </ul>
+        </div>
+      </div>
       <table id="example2" class="table table-bordered table-hover">
         <thead>
           <tr>
             <th></th>
             <th>${_(u'início de processo')}</th>
+            <th>${_(u'periódico')}</th>
             <th>${_(u'depósito')}</th>
+            <th>${_(u'prefixo')}</th>
             <th>${_(u'situação de submissão')}</th>
             <th>${_(u'situação de depósito')}</th>
             <th>${_(u'funções')}</th>
@@ -79,7 +121,9 @@
             <tr>
               <td>${offset+ndx+1}</td>
               <td>${item.started_at}</td>
+              <td>${item.journal} (${item.issue_label})</td>
               <td><a href="${request.route_url('deposit', deposit_item_code=item.code)}">${item.code}</a></td>
+              <td>${item.prefix}</td>
               <td>
                 <span class="label label-${status_to_template[item.submission_status or 'unknow'][0]}">${item.submission_status}</span>
               </td>
@@ -99,10 +143,10 @@
         </tbody>
       </table>
       <div class="row">
-        <div class="col-sm-2">
+        <div class="col-sm-4">
           ${_(u'mostrando')} ${offset+1} ${_(u'a')} ${offset + limit} ${_(u'de')} ${ total } ${_(u'itens')}
         </div>
-        <div class="col-sm-10">
+        <div class="col-sm-8">
           <ul class="pagination pull-right">
             % if offset > 0:
               <li class="paginate_button previous">

@@ -1,5 +1,6 @@
 STATUS_TO_TEMPLATE = {
     'waiting': ('warning', 'orange', 'fa-minus'),
+    'warning': ('danger', 'red', 'fa-close'),
     'error': ('danger', 'red', 'fa-close'),
     'success': ('success', 'green', 'fa-check'),
     'unknow': ('default', 'gray', 'fa-info'),

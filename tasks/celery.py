@@ -9,14 +9,18 @@ from celery.utils.log import get_task_logger
 from lxml import etree
 
 from crossref.client import CrossrefClient
-from doi_request.models.depositor import Deposit
-from doi_request.models import initialize_sql
-from sqlalchemy import create_engine
+from doi_request.models.depositor import Deposit, LogEvent
+from doi_request.models import configure_session_engine, DBSession
+
 
 logger = get_task_logger(__name__)
 
+# Celery Config
 app = Celery('tasks', broker='amqp://guest@rabbitmq//')
 
+# Database Config
+configure_session_engine()
+ 
 crossref_client = CrossrefClient(
     os.environ.get('CROSSREF_PREFIX', ''),
     os.environ.get('CROSSREF_API_USER', ''),
@@ -45,133 +49,185 @@ REQUEST_DOI_DELAY_RETRY = 60
 REGISTER_DOI_DELAY_RETRY_TD = timedelta(seconds=REGISTER_DOI_DELAY_RETRY)
 REQUEST_DOI_DELAY_RETRY_TD = timedelta(seconds=REQUEST_DOI_DELAY_RETRY)
 
-# Database Config
-engine = create_engine(os.environ.get('SQL_ALCHEMY', 'sqlite:///:memory:'))
-initialize_sql(engine)
-
 
 @app.task(bind=True, default_retry_delay=REGISTER_DOI_DELAY_RETRY, retry_kwargs={'max_retries': 100})
 def register_doi(self, code, xml):
-    deposit_item = Deposit.objects(pk=code)[0]
-    attempts = 0
+    deposit = DBSession.query(Deposit).filter_by(code=code).first()
 
     try:
+        log_title = 'Sending XML to Crossref'
+        logevent = LogEvent()
+        logevent.title = log_title
+        logevent.type = 'submission'
+        logevent.status = 'info'
+        logevent.deposit_code = deposit.code
+        DBSession.add(logevent)
+        DBSession.commit()
         result = crossref_client.register_doi(code, xml)
     except Exception as exc:
-        msg = 'Fail to Connect to Crossref API, retrying at (%s) to submit (%s)' % (
+        log_title = 'Fail to Connect to Crossref API, retrying at (%s) to submit (%s)' % (
             datetime.now()+REGISTER_DOI_DELAY_RETRY_TD, code
         )
-        logger.error(msg)
+        logger.error(log_title)
         now = datetime.now()
-        deposit_item.submission_log = msg
-        deposit_item.submission_status = 'error'
-        deposit_item.submission_updated_at = now
-        deposit_item.updated_at = now
-        deposit_item.save()
-        raise self.retry(exc=ComunicationError(exc))
+        deposit.submission_status = 'waiting'
+        deposit.submission_updated_at = now
+        deposit.updated_at = now
+        logevent = LogEvent()
+        logevent.title = log_title
+        logevent.body = str(exc)
+        logevent.type = 'submission'
+        logevent.status = 'error'
+        logevent.deposit_code = deposit.code
+        DBSession.add(logevent)
+        DBSession.commit()
+        raise self.retry(exc=ComunicationError(log_title))
 
     if result.status_code != 200:
-        msg = 'Fail to Connect to Crossref API, retrying at to submit (%s)' % (
+        log_title = 'Fail to Connect to Crossref API, retrying at (%s) to submit (%s)' % (
             datetime.now()+REGISTER_DOI_DELAY_RETRY_TD, code
         )
-        logger.error(msg)
+        logger.error(log_title)
         now = datetime.now()
-        deposit_item.submission_log = msg
-        deposit_item.submission_status = 'error'
-        deposit_item.submission_updated_at = now
-        deposit_item.updated_at = now
-        deposit_item.save()
-        raise self.retry(exc=RequestError(msg))
+        deposit.submission_log = log_title
+        deposit.submission_status = 'waiting'
+        deposit.submission_updated_at = now
+        deposit.updated_at = now
+        logevent = LogEvent()
+        logevent.title = log_title
+        logevent.body = str('HTTP status code %d' % result.status_code)
+        logevent.type = 'submission'
+        logevent.status = 'error'
+        logevent.deposit_code = deposit.code
+        DBSession.add(logevent)
+        DBSession.commit()
+        raise self.retry(exc=RequestError(log_title))
 
     if result.status_code == 200 and 'SUCCESS' in result.text:
-        msg = 'Success registering DOI for (%s)' % code
+        log_title = 'Success sending metadata for (%s)' % code
+        logger.debug(log_title)
         now = datetime.now()
-        deposit_item.submission_log = msg
-        deposit_item.submission_response = result.text
-        deposit_item.submission_status_code = result.status_code
-        deposit_item.submission_status = 'success'
-        deposit_item.submission_updated_at = now
-        deposit_item.updated_at = now
-        deposit_item.save()
-        logger.debug(msg)
+        deposit.submission_status = 'success'
+        deposit.submission_updated_at = now
+        deposit.updated_at = now
+        logevent = LogEvent()
+        logevent.title = log_title
+        logevent.body = result.text
+        logevent.type = 'submission'
+        logevent.status = 'success'
+        logevent.deposit_code = deposit.code
+        DBSession.add(logevent)
+        DBSession.commit()
         return (True, code)
 
-    msg = 'Fail registering DOI for (%s)' % code
+    log_title = 'Fail registering DOI for (%s)' % code
     now = datetime.now()
-    deposit_item.submission_status = 'error'
-    deposit_item.submission_log = msg
-    deposit_item.submission_status_code = result.status_code
-    deposit_item.submission_response = result.text
-    deposit_item.submission_updated_at = now
-    deposit_item.updated_at = now
-    deposit_item.save()
+    deposit.submission_status = 'error'
+    deposit.submission_updated_at = now
+    deposit.updated_at = now
+    logevent = LogEvent()
+    logevent.title = log_title
+    logevent.body = result.text
+    logevent.type = 'submission'
+    logevent.status = 'error'
+    logevent.deposit_code = deposit.code
+    DBSession.add(logevent)
+    DBSession.commit()
     return (False, code)
 
 @app.task(bind=True, default_retry_delay=REQUEST_DOI_DELAY_RETRY, retry_kwargs={'max_retries': 200})
 def request_doi_status(self, deposit, doi_batch_id):
     is_doi_register_submitted, code = deposit
-    deposit_item = Deposit.objects(pk=code)[0]
+    deposit = DBSession.query(Deposit).filter_by(code=code).first()
 
     if is_doi_register_submitted is False:
         return False
 
-    msg = 'Checking DOI registering Status for (%s)' % doi_batch_id
+    log_title = 'Checking DOI registering Status for (%s)' % doi_batch_id
     now = datetime.now()
-    deposit_item.feedback_log = msg
-    deposit_item.feedback_status = 'waiting'
-    deposit_item.feedback_updated_at = now
-    deposit_item.updated_at = now
-    deposit_item.save()
+    deposit.feedback_status = 'waiting'
+    deposit.feedback_updated_at = now
+    deposit.updated_at = now
+    logevent = LogEvent()
+    logevent.title = log_title
+    logevent.type = 'feedback'
+    logevent.status = 'info'
+    logevent.deposit_code = deposit.code
+    DBSession.add(logevent)
+    DBSession.commit()
 
     try:
         result = crossref_client.request_doi_status_by_batch_id(doi_batch_id)
     except Exception as exc:
-        msg = 'Fail to Connect to Crossref API, retrying to check submission status at (%s) for (%s)' % (
+        log_title = 'Fail to Connect to Crossref API, retrying to check submission status at (%s) for (%s)' % (
             datetime.now()+REQUEST_DOI_DELAY_RETRY_TD, doi_batch_id
         )
-        logger.error(msg)
+        logger.error(log_title)
         now = datetime.now()
-        deposit_item.feedback_log = msg
-        deposit_item.feedback_status = 'error'
-        deposit_item.feedback_updated_at = now
-        deposit_item.updated_at = now
-        deposit_item.save()
-        raise self.retry(exc=ComunicationError(exc))
+        deposit.feedback_status = 'waiting'
+        deposit.feedback_updated_at = now
+        deposit.updated_at = now
+        logevent = LogEvent()
+        logevent.title = log_title
+        logevent.type = 'feedback'
+        logevent.status = 'error'
+        logevent.deposit_code = deposit.code
+        DBSession.add(logevent)
+        DBSession.commit()
+        raise self.retry(exc=ComunicationError(log_title))
 
-    deposit_item.feedback_request_status_code = result.status_code
+    deposit.feedback_request_status_code = result.status_code
     if result.status_code != 200:
-        msg = 'Fail to Connect to Crossref API, retrying to check submission status at (%s) (%s)' % (
-            datetime.now()+REQUEST_DOI_DELAY_RETRY_TD, doi_batch_id
-        )
         now = datetime.now()
-        deposit_item.feedback_log = msg
-        deposit_item.feedback_status = 'error'
-        deposit_item.feedback_updated_at = now
-        deposit_item.updated_at = now
-        deposit_item.save()
-        raise self.retry(exc=RequestError(msg))
+        log_title = 'Fail to Connect to Crossref API, retrying to check submission status at (%s) (%s)' % (
+            now+REQUEST_DOI_DELAY_RETRY_TD, doi_batch_id
+        )
+        deposit.feedback_status = 'waiting'
+        deposit.feedback_updated_at = now
+        deposit.updated_at = now
+        logevent = LogEvent()
+        logevent.title = log_title
+        logevent.body = str('HTTP status code %d' % result.status_code)
+        logevent.type = 'feedback'
+        logevent.status = 'error'
+        logevent.deposit_code = deposit.code
+        DBSession.add(logevent)
+        DBSession.commit()
+        raise self.retry(exc=RequestError(log_title))
 
     xml = BytesIO(result.text.encode('utf-8'))
     xml_doc = etree.parse(xml)
     doi_batch_status = xml_doc.find('.').get('status')
     if doi_batch_status != 'completed':
-        msg = 'Waiting Crossref to load this request (%s)' % doi_batch_id
-        logger.error(msg)
+        log_title = 'Crossref has received the request, waiting Crossref to process it (%s)' % doi_batch_id
+        logger.error(log_title)
         now = datetime.now()
-        deposit_item.feedback_log = msg
-        deposit_item.feedback_status = 'waiting'
-        deposit_item.feedback_updated_at = now
-        deposit_item.updated_at = now
-        deposit_item.save()
-        raise self.retry(exc=UnkownSubmission(msg))
+        deposit.feedback_status = 'waiting'
+        deposit.feedback_updated_at = now
+        deposit.updated_at = now
+        logevent = LogEvent()
+        logevent.title = log_title
+        logevent.type = 'feedback'
+        logevent.status = 'info'
+        logevent.deposit_code = deposit.code
+        DBSession.add(logevent)
+        DBSession.commit()
+        raise self.retry(exc=UnkownSubmission(log_title))
 
     feedback_status = xml_doc.find('.//record_diagnostic').get('status').lower() or 'unkown'
-    msg = 'Crossref final status for (%s) is (%s)' % (doi_batch_id, feedback_status)
-    logger.info(msg)
+    feedback_body = xml_doc.find('.//record_diagnostic/msg').text or ''
+    log_title = 'Crossref final status for (%s) is (%s)' % (doi_batch_id, feedback_status)
+    logger.info(log_title)
     now = datetime.now()
-    deposit_item.feedback_log = msg
-    deposit_item.feedback_status = feedback_status
-    deposit_item.feedback_xml = etree.tostring(xml_doc).decode('utf-8')
-    deposit_item.updated_at = now
-    deposit_item.feedback_updated_at = now
-    deposit_item.save()
+    deposit.feedback_status = feedback_status
+    deposit.feedback_xml = etree.tostring(xml_doc).decode('utf-8')
+    deposit.updated_at = now
+    deposit.feedback_updated_at = now
+    logevent = LogEvent()
+    logevent.title = log_title
+    logevent.body = feedback_body
+    logevent.type = 'feedback'
+    logevent.status = feedback_status
+    logevent.deposit_code = deposit.code
+    DBSession.add(logevent)
+    DBSession.commit()
