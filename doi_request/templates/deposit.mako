@@ -112,7 +112,7 @@
       lineWrapping: true,
       readOnly: true,
     });
-    var myCodeMirror_feedback = CodeMirror.fromTextArea(document.getElementById("feedback_xml"),{
+    var myCodeMirror_feedback = CodeMirror.fromTextArea(document.getElementById("feedback_xml"), {
       mode: 'application/xml',
       lineNumbers: true,
       lineWrapping: true,

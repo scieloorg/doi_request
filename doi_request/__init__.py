@@ -8,6 +8,13 @@ from sqlalchemy.orm import sessionmaker
 from doi_request.models import initialize_sql
 
 
+VERSION = '1.0.0'
+
+
+def version(request):
+    return VERSION
+
+
 def db(request):
     maker = request.registry.dbmaker
     session = maker()
@@ -29,11 +36,12 @@ def main(global_config, **settings):
     config = Configurator(settings=settings)
 
     # Database Config
-    engine = create_engine(os.environ.get('SQL_ALCHEMY', 'sqlite:///:memory:'))
+    engine = create_engine(os.environ.get('SQL_ENGINE', 'sqlite:///:memory:'))
     config.registry.dbmaker = sessionmaker(bind=engine)
     config.scan('doi_request.models')  # the "important" line
     initialize_sql(engine)
     config.add_request_method(db, reify=True)
+    config.add_request_method(version)
 
     config.include('pyramid_mako')
     config.add_static_view('static', 'static', cache_max_age=3600)

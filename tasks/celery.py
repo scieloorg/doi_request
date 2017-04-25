@@ -20,7 +20,7 @@ app = Celery('tasks', broker='amqp://guest@rabbitmq//')
 
 # Database Config
 configure_session_engine()
- 
+
 crossref_client = CrossrefClient(
     os.environ.get('CROSSREF_PREFIX', ''),
     os.environ.get('CROSSREF_API_USER', ''),

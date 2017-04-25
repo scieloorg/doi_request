@@ -94,7 +94,7 @@
       <!-- /.content-wrapper -->
       <footer class="main-footer">
           <div class="pull-right hidden-xs">
-            <b>Version</b> 2.3.8
+            <b>Version</b> ${version}
           </div>
         <strong>SciELO DOI Manager</strong>
       </footer>

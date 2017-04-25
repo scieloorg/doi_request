@@ -1,7 +1,7 @@
 <%inherit file="base.mako"/>
 
 <%block name="central_container">
-  <div class="box box-primary">
+  <div class="box box-primary collapsed-box">
     <div class="box-header with-border">
       <h3 class="box-title">${_('Filtros')}</h3>
       <div class="box-tools pull-right">
@@ -13,15 +13,15 @@
       <form name="filter" action="${request.route_url('list_deposits')}" method="get">
         <div class="form-group">
           <label>${_(u'ISSN')}</label>
-            <input name="issn" type="text" class="form-control" value="${filter_issn or ''}"></input>
+            <input name="filter_issn" type="text" class="form-control" value="${filter_issn or ''}"></input>
         </div>
         <div class="form-group">
           <label>${_(u'Prefix')}</label>
-            <input name="prefix" type="text" class="form-control" value="${filter_prefix or ''}"></input>
+            <input name="filter_prefix" type="text" class="form-control" value="${filter_prefix or ''}"></input>
         </div>
         <div class="form-group">
           <label>${_(u'Situação de submissão')}</label>
-          <select name="submission_status" class="form-control">
+          <select name="filter_submission_status" class="form-control">
             <option value="" ${'selected' if filter_submission_status == '' else ''}>${_(u'todos')}</option>
             % for item in status_to_template:
               <option value="${item}" ${'selected' if filter_submission_status == item else ''}>${item}</option>
@@ -30,7 +30,7 @@
         </div>
         <div class="form-group">
           <label>${_(u'Situação de depósito')}</label>
-          <select name="feedback_status" class="form-control">
+          <select name="filter_feedback_status" class="form-control">
             <option value="" ${'selected' if filter_feedback_status == '' else ''}>${_(u'todos')}</option>
             % for item in status_to_template:
               <option value="${item}" ${'selected' if filter_feedback_status == item else ''}>${item}</option>
@@ -43,7 +43,7 @@
             <div class="input-group-addon">
               <i class="fa fa-calendar"></i>
             </div>
-            <input class="form-control pull-right" name="feedback_start_range" type="text">
+            <input class="form-control pull-right" name="filter_start_range" type="text">
           </div>
           <!-- /.input group -->
         </div>
@@ -72,65 +72,36 @@
     </div>
     <div class="box-body">
       <div class="row">
-        <div class="col-sm-4">
-          ${_(u'mostrando')} ${offset+1} ${_(u'a')} ${offset + limit} ${_(u'de')} ${ total } ${_(u'itens')}
-        </div>
-        <div class="col-sm-8">
-          <ul class="pagination pull-right">
-            % if offset > 0:
-              <li class="paginate_button previous">
-                <a href="/?offset=${offset-limit}">Previous</a>
-              </li>
-            % else:
-              <li class="paginate_button previous disabled">
-                <a href="#">Previous</a>
-              </li>
-            % endif
-            % for offset_item in range(offset, total, limit)[0:4]:
-            <li class="paginate_button previous">
-              <a href="/?offset=${offset_item}">${int((offset_item/limit)+1)}</a>
-            </li>
-            % endfor
-            % if offset+limit <= total:
-              <li class="paginate_button next" id="example2_next">
-                <a href="/?offset=${offset+limit}">Next</a>
-              </li>
-            % else:
-              <li class="paginate_button next disabled">
-                <a href="#">Next</a>
-              </li>
-            % endif
-          </ul>
-        </div>
+      <%include file="deposits_paging.mako"/>
       </div>
       <table id="example2" class="table table-bordered table-hover">
         <thead>
           <tr>
-            <th></th>
-            <th>${_(u'início de processo')}</th>
-            <th>${_(u'periódico')}</th>
+            <th class="visible-md visible-lg"></th>
+            <th class="visible-md visible-lg">${_(u'início de processo')}</th>
+            <th class="visible-md visible-lg">${_(u'periódico')}</th>
             <th>${_(u'depósito')}</th>
-            <th>${_(u'prefixo')}</th>
+            <th class="visible-md visible-lg">${_(u'prefixo')}</th>
             <th>${_(u'situação de submissão')}</th>
             <th>${_(u'situação de depósito')}</th>
-            <th>${_(u'funções')}</th>
+            <th class="visible-md visible-lg">${_(u'funções')}</th>
           </tr>
         </thead>
         <tbody>
           % for ndx, item in enumerate(deposits):
             <tr>
-              <td>${offset+ndx+1}</td>
-              <td>${item.started_at}</td>
-              <td>${item.journal} (${item.issue_label})</td>
+              <td class="visible-md visible-lg">${offset+ndx+1}</td>
+              <td class="visible-md visible-lg">${item.started_at.strftime('%Y-%m-%d %H:%M:%S')}</td>
+              <td class="visible-md visible-lg">${item.journal} (${item.issue_label})</td>
               <td><a href="${request.route_url('deposit', deposit_item_code=item.code)}">${item.code}</a></td>
-              <td>${item.prefix}</td>
+              <td class="visible-md visible-lg">${item.prefix}</td>
               <td>
                 <span class="label label-${status_to_template[item.submission_status or 'unknow'][0]}">${item.submission_status}</span>
               </td>
               <td>
                 <span class="label label-${status_to_template[item.feedback_status or 'unknow'][0]}">${item.feedback_status or ''}</span>
               </td>
-              <td>
+              <td class="visible-md visible-lg">
               <a href="${request.route_url('deposit', deposit_item_code=item.code)}">
                 <button type="button" class="btn btn-primary btn-sm"><i class="fa fa-folder-open"></i> ${_(u'detalhes')}</button>
               </a>
@@ -143,36 +114,7 @@
         </tbody>
       </table>
       <div class="row">
-        <div class="col-sm-4">
-          ${_(u'mostrando')} ${offset+1} ${_(u'a')} ${offset + limit} ${_(u'de')} ${ total } ${_(u'itens')}
-        </div>
-        <div class="col-sm-8">
-          <ul class="pagination pull-right">
-            % if offset > 0:
-              <li class="paginate_button previous">
-                <a href="/?offset=${offset-limit}">Previous</a>
-              </li>
-            % else:
-              <li class="paginate_button previous disabled">
-                <a href="#">Previous</a>
-              </li>
-            % endif
-            % for offset_item in range(offset, total, limit)[0:4]:
-            <li class="paginate_button previous">
-              <a href="/?offset=${offset_item}">${int((offset_item/limit)+1)}</a>
-            </li>
-            % endfor
-            % if offset+limit <= total:
-              <li class="paginate_button next" id="example2_next">
-                <a href="/?offset=${offset+limit}">Next</a>
-              </li>
-            % else:
-              <li class="paginate_button next disabled">
-                <a href="#">Next</a>
-              </li>
-            % endif
-          </ul>
-        </div>
+      <%include file="deposits_paging.mako"/>
       </div>
     </div>
   </div>
@@ -180,7 +122,7 @@
 
 <%block name="footer_js">
 <script type="text/javascript">
-  $('input[name="feedback_start_range"]').daterangepicker(
+  $('input[name="filter_start_range"]').daterangepicker(
 {
     locale: {
       format: 'MM/DD/YYYY'

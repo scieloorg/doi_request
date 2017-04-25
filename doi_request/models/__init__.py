@@ -9,7 +9,7 @@ Base = declarative_base()
 
 
 def create_engine_from_env():
-    return create_engine(os.environ.get('SQL_ALCHEMY', 'sqlite:///:memory:'))
+    return create_engine(os.environ.get('SQL_ENGINE', 'sqlite:///:memory:'))
 
 
 def configure_session_engine(engine=None):

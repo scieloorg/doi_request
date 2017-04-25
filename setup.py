@@ -2,14 +2,13 @@
 import os
 
 from setuptools import setup, find_packages
+from doi_request import VERSION
 
 here = os.path.abspath(os.path.dirname(__file__))
 with open(os.path.join(here, 'README.rst')) as f:
     README = f.read()
 with open(os.path.join(here, 'CHANGES.txt')) as f:
     CHANGES = f.read()
-
-VERSION = '1.0.0'
 
 install_requires = [
     'thriftpy==0.3.1',
@@ -23,7 +22,9 @@ install_requires = [
     'lxml',
     'mongoengine',
     'celery',
-    'SQLAlchemy'
+    'SQLAlchemy',
+    'psycopg2',
+    'zope.sqlalchemy'
 ]
 
 tests_require = [
