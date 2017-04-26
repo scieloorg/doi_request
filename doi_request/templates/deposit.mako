@@ -87,6 +87,8 @@
     <div class="tab-pane" id="submission_details">
       <strong>${_(u'XML é válido')}</strong>
       <p>${deposit.is_xml_valid}</p>
+      <strong>${_(u'XML com referências é válido')}</strong>
+      <p>${deposit.has_submission_xml_valid_references}</p>
       <strong>${_(u'Situação da submissão')}</strong>
       <p>${deposit.submission_status}</p>
       <strong>${_(u'XML de depósito')}</strong>

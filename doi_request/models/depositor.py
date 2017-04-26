@@ -12,7 +12,8 @@ class Deposit(Base):
     volume = Column('volume', String(16))
     number = Column('number', String(16))
     issue_label = Column('issue_label', String(32))
-    journal = Column('journal', String(128), nullable=False, index=True)
+    journal = Column('journal', String(256), nullable=False, index=True)
+    journal_acronym = Column('journal_acronym', String(16), nullable=False, index=True)
     collection_acronym = Column('collection_acronym', String(3), nullable=False)
     xml_file_name = Column('xml_file_name', String(32), nullable=False)
     prefix = Column('prefix', String(16), nullable=False, index=True)
@@ -25,6 +26,7 @@ class Deposit(Base):
     submission_status = Column('submission_status', String(16), default='unknow', index=True)
     submission_updated_at = Column('submission_updated_at', DateTime(timezone=True))
     submission_response = Column('submission_response', Text, default='')
+    has_submission_xml_valid_references = Column('has_submission_xml_valid_references', Boolean, index=True)
     feedback_xml = Column('feedback_xml', Text, default='')
     feedback_status = Column('feedback_status', String(16), index=True)
     feedback_updated_at = Column('feedback_updated_at', DateTime(timezone=True))
@@ -32,7 +34,7 @@ class Deposit(Base):
 
     @property
     def timeline(self):
-        return self.log_events
+        return sorted(self.log_events, key=lambda event: event.date)
 
 
 class LogEvent(Base):

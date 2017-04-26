@@ -40,6 +40,14 @@ def check_session(wrapped):
             'filter_prefix',
             request.session.get('filter_prefix', '')
         )
+        filter_journal_acronym = request.GET.get(
+            'filter_journal_acronym',
+            request.session.get('filter_journal_acronym', '')
+        )
+        filter_has_valid_references = request.GET.get(
+            'filter_has_valid_references',
+            request.session.get('filter_has_valid_references', '')
+        )
         offset = request.GET.get(
             'offset',
             request.session.get('offset', 0)
@@ -48,6 +56,8 @@ def check_session(wrapped):
         request.session['filter_issn'] = filter_issn
         request.session['filter_submission_status'] = filter_submission_status
         request.session['filter_feedback_status'] = filter_feedback_status
+        request.session['filter_journal_acronym'] = filter_journal_acronym
+        request.session['filter_has_valid_references'] = filter_has_valid_references
         request.session['filter_start_range'] = filter_start_range
         request.session['filter_prefix'] = filter_prefix
         request.session['_LOCALE_'] = locale

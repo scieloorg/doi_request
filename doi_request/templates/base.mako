@@ -60,7 +60,7 @@
         <section class="sidebar">
           <form action="${request.route_url('list_deposits')}" method="get" class="sidebar-form">
             <div class="input-group">
-              <input type="text" name="pid_doi" class="form-control" placeholder="${_(u'pesquise por DOI ou PID')}">
+              <input type="text" name="filter_pid_doi" class="form-control" placeholder="${_(u'pesquise por DOI ou PID')}">
                   <span class="input-group-btn">
                     <button type="submit" id="search-btn" class="btn btn-flat"><i class="fa fa-search"></i>
                     </button>

@@ -61,7 +61,7 @@ class Depositor(object):
 
         return xml
 
-    def xml_is_valid(self, xml):
+    def xml_is_valid(self, xml, only_front=False):
         xml = BytesIO(xml.encode('utf-8'))
         try:
             xml_doc = etree.parse(xml)
@@ -72,6 +72,11 @@ class Depositor(object):
             return (False, '', str(e))
 
         xml_doc = self._setup_depositor(xml_doc)
+
+        if only_front:
+            citation_list = xml_doc.find('//{http://www.crossref.org/schema/4.4.0}citation_list')
+            if citation_list:
+                citation_list.getparent().remove(citation_list)
 
         try:
             result = self.crossref_schema.assertValid(xml_doc)
@@ -98,10 +103,12 @@ class Depositor(object):
             number=document.issue.number,
             issue_label=document.issue.label,
             journal=document.journal.title,
+            journal_acronym=document.journal.acronym,
             collection_acronym=document.collection_acronym,
             xml_file_name=xml_file_name,
             doi=document.doi,
             prefix=doi_prefix,
+            has_submission_xml_valid_references=False,
             submission_updated_at=now,
             submission_status='waiting',
             updated_at=now,
@@ -179,43 +186,97 @@ class Depositor(object):
         is_valid, parsed_xml, exc = self.xml_is_valid(xml)
         depitem.submission_xml = etree.tostring(parsed_xml, encoding='utf-8', pretty_print=True).decode('utf-8')
 
-        if is_valid is False:
-            log_title = 'XML is invalid, fail to parse xml for document (%s)' % code
+        if is_valid is True:
+            log_title = 'XML is valid, it will be submitted to Crossref'
             now = datetime.now()
-            logger.error(log_title)
-            depitem.is_xml_valid = False
-            depitem.submission_status = 'error'
+            logger.info(log_title)
+            depitem.is_xml_valid = True
+            depitem.has_submission_xml_valid_references = True
+            depitem.submission_status = 'waiting'
             depitem.submission_updated_at = now
-            depitem.updated_at = now
+            depitem.doi_batch_id = parsed_xml.find('//{http://www.crossref.org/schema/4.4.0}doi_batch_id').text
             logevent = LogEvent()
             logevent.title = log_title
-            logevent.body = exc
             logevent.type = 'submission'
-            logevent.status = 'error'
+            logevent.status = 'success'
             logevent.deposit_code = depitem.code
             DBSession.add(logevent)
             DBSession.commit()
+
+            register_doi.apply_async(
+                (code, depitem.submission_xml),
+                link=request_doi_status.s(depitem.doi_batch_id)
+            )
             return
 
-        log_title = 'XML is valid, it will be submitted to Crossref'
+        log_title = 'XML with references is invalid, fail to parse xml for document (%s)' % code
         now = datetime.now()
-        logger.info(log_title)
-        depitem.is_xml_valid = True
-        depitem.submission_status = 'waiting'
+        logger.error(log_title)
+        depitem.is_xml_valid = False
+        depitem.submission_status = 'error'
         depitem.submission_updated_at = now
-        depitem.doi_batch_id = parsed_xml.find('//{http://www.crossref.org/schema/4.4.0}doi_batch_id').text
+        depitem.updated_at = now
         logevent = LogEvent()
         logevent.title = log_title
+        logevent.body = exc
         logevent.type = 'submission'
-        logevent.status = 'success'
+        logevent.status = 'error'
         logevent.deposit_code = depitem.code
         DBSession.add(logevent)
         DBSession.commit()
 
-        register_doi.apply_async(
-            (code, depitem.submission_xml),
-            link=request_doi_status.s(depitem.doi_batch_id)
-        )
+        log_title = 'Trying to send XML without references'
+        now = datetime.now()
+        logger.error(log_title)
+        logevent = LogEvent()
+        logevent.title = log_title
+        logevent.type = 'submission'
+        logevent.status = 'info'
+        logevent.deposit_code = depitem.code
+        DBSession.add(logevent)
+        DBSession.commit()
+
+        is_valid, parsed_xml, exc = self.xml_is_valid(xml, only_front=True)
+        front_xml = etree.tostring(parsed_xml, encoding='utf-8', pretty_print=True).decode('utf-8')
+
+        if is_valid is True:
+            log_title = 'XML only with front metadata is valid, it will be submitted to Crossref'
+            now = datetime.now()
+            logger.info(log_title)
+            depitem.is_xml_valid = True
+            depitem.submission_status = 'waiting'
+            depitem.submission_updated_at = now
+            depitem.doi_batch_id = parsed_xml.find('//{http://www.crossref.org/schema/4.4.0}doi_batch_id').text
+            logevent = LogEvent()
+            logevent.title = log_title
+            logevent.type = 'submission'
+            logevent.status = 'success'
+            logevent.deposit_code = depitem.code
+            DBSession.add(logevent)
+            DBSession.commit()
+
+            register_doi.apply_async(
+                (code, front_xml),
+                link=request_doi_status.s(depitem.doi_batch_id)
+            )
+            return
+
+        log_title = 'XML on with front metadata is also invalid, fail to parse xml for document (%s)' % code
+        now = datetime.now()
+        logger.error(log_title)
+        depitem.is_xml_valid = False
+        depitem.submission_status = 'error'
+        depitem.submission_updated_at = now
+        depitem.updated_at = now
+        logevent = LogEvent()
+        logevent.title = log_title
+        logevent.body = exc
+        logevent.type = 'submission'
+        logevent.status = 'error'
+        logevent.deposit_code = depitem.code
+        DBSession.add(logevent)
+        DBSession.commit()
+        return
 
     def deposit_by_pid(self, pid, collection):
 

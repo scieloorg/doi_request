@@ -16,8 +16,20 @@
             <input name="filter_issn" type="text" class="form-control" value="${filter_issn or ''}"></input>
         </div>
         <div class="form-group">
+          <label>${_(u'Acrônimo do periódico')}</label>
+            <input name="filter_journal_acronym" type="text" class="form-control" value="${filter_journal_acronym or ''}"></input>
+        </div>
+        <div class="form-group">
           <label>${_(u'Prefix')}</label>
             <input name="filter_prefix" type="text" class="form-control" value="${filter_prefix or ''}"></input>
+        </div>
+        <div class="form-group">
+          <label>${_(u'Referências válidas')}</label>
+            <select name="filter_has_valid_references" class="form-control">
+              <option value="" ${'selected' if filter_has_valid_references == '' else ''}>${_(u'todos')}</option>
+              <option value="True" ${'selected' if filter_has_valid_references == 'True' else ''}>True</option>
+              <option value="False" ${'selected' if filter_has_valid_references == 'False' else ''}>False</option>
+            </select>
         </div>
         <div class="form-group">
           <label>${_(u'Situação de submissão')}</label>
@@ -60,7 +72,7 @@
         <div class="has-feedback">
           <form name="query_by_id" action="${request.route_url('list_deposits')}" method="get">
             <div class="input-group">
-              <input type="text" name="pid_doi" class="form-control" placeholder="${_(u'pesquise por DOI ou PID')}">
+              <input type="text" name="filter_pid_doi" class="form-control" placeholder="${_(u'pesquise por DOI ou PID')}">
               <span class="input-group-btn">
                 <button type="submit" id="search-btn" class="btn btn-default btn-flat"><i class="fa fa-search"></i>
                 </button>
@@ -74,14 +86,15 @@
       <div class="row">
       <%include file="deposits_paging.mako"/>
       </div>
-      <table id="example2" class="table table-bordered table-hover">
+      <table id="deposits" class="table table-bordered table-hover">
         <thead>
           <tr>
             <th class="visible-md visible-lg"></th>
             <th class="visible-md visible-lg">${_(u'início de processo')}</th>
-            <th class="visible-md visible-lg">${_(u'periódico')}</th>
+            <th>${_(u'periódico')}</th>
             <th>${_(u'depósito')}</th>
             <th class="visible-md visible-lg">${_(u'prefixo')}</th>
+            <th class="visible-md visible-lg">${_(u'referências válidas')}</th>
             <th>${_(u'situação de submissão')}</th>
             <th>${_(u'situação de depósito')}</th>
             <th class="visible-md visible-lg">${_(u'funções')}</th>
@@ -92,9 +105,10 @@
             <tr>
               <td class="visible-md visible-lg">${offset+ndx+1}</td>
               <td class="visible-md visible-lg">${item.started_at.strftime('%Y-%m-%d %H:%M:%S')}</td>
-              <td class="visible-md visible-lg">${item.journal} (${item.issue_label})</td>
+              <td><span class="visible-md visible-lg">${item.journal}</span> (${item.journal_acronym.upper()}) (${item.issue_label})</td>
               <td><a href="${request.route_url('deposit', deposit_item_code=item.code)}">${item.code}</a></td>
               <td class="visible-md visible-lg">${item.prefix}</td>
+              <td class="visible-md visible-lg">${item.has_submission_xml_valid_references}</td>
               <td>
                 <span class="label label-${status_to_template[item.submission_status or 'unknow'][0]}">${item.submission_status}</span>
               </td>

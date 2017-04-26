@@ -15,10 +15,10 @@ from doi_request import template_choices
 from doi_request import controller
 from doi_request.control_manager import check_session
 from doi_request.control_manager import base_data_manager
+from doi_request.utils import pagination_ruler
 
 depositor = controller.Depositor()
 LIMIT = 100
-
 
 @view_config(route_name='list_deposits', renderer='templates/deposits.mako')
 @check_session
@@ -43,6 +43,10 @@ def list_deposits(request):
             deposits = deposits.filter(Deposit.issn == request.session['filter_issn'])
         if request.session['filter_prefix']:
             deposits = deposits.filter(Deposit.prefix == request.session['filter_prefix'])
+        if request.session['filter_journal_acronym']:
+            deposits = deposits.filter(Deposit.journal_acronym == request.session['filter_journal_acronym'])
+        if request.session['filter_has_valid_references']:
+            deposits = deposits.filter(Deposit.has_submission_xml_valid_references == request.session['filter_has_valid_references'])
 
     total = deposits.count()
     deposits = deposits.order_by(desc('started_at')).limit(LIMIT).offset(request.session['offset'])
@@ -51,6 +55,8 @@ def list_deposits(request):
     data['filter_from_date'] = from_date
     data['filter_to_date'] = to_date
     data['filter_feedback_status'] = request.session['filter_feedback_status']
+    data['filter_has_valid_references'] = request.session['filter_has_valid_references']
+    data['filter_journal_acronym'] = request.session['filter_journal_acronym']
     data['filter_submission_status'] = request.session['filter_submission_status']
     data['filter_issn'] = request.session['filter_issn']
     data['filter_prefix'] = request.session['filter_prefix']
@@ -58,6 +64,7 @@ def list_deposits(request):
     data['limit'] = LIMIT if LIMIT <= total else total + 1
     data['total'] = total
     data['page'] = int((request.session['offset']/LIMIT)+1)
+    data['pagination_ruler'] = pagination_ruler(LIMIT, total, request.session['offset'])
     data['total_pages'] = int((total/LIMIT)+1)
 
     return data

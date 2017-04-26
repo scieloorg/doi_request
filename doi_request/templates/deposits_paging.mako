@@ -12,9 +12,9 @@
         <a href="#">Previous</a>
       </li>
     % endif
-    % for offset_item in range(offset, total, limit):
-    <li class="paginate_button ${'active' if page == int((offset_item/limit)+1) else ''}">
-      <a href="/?offset=${offset_item}">${int((offset_item/limit)+1)}</a>
+    % for ppage, pcurrent, poffset, pstart_range, pend_range in pagination_ruler:
+    <li class="paginate_button ${'active' if pcurrent is True else ''}">
+      <a href="/?offset=${poffset}">${ppage}</a>
     </li>
     % endfor
     % if offset+limit <= total:

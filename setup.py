@@ -2,7 +2,6 @@
 import os
 
 from setuptools import setup, find_packages
-from doi_request import VERSION
 
 here = os.path.abspath(os.path.dirname(__file__))
 with open(os.path.join(here, 'README.rst')) as f:
@@ -24,7 +23,8 @@ install_requires = [
     'celery',
     'SQLAlchemy',
     'psycopg2',
-    'zope.sqlalchemy'
+    'zope.sqlalchemy',
+    'alembic'
 ]
 
 tests_require = [
@@ -36,7 +36,7 @@ tests_require = [
 
 setup(
     name="doi_request",
-    version=VERSION,
+    version="1.0.0",
     description="Tool to manage the DOI registering process",
     long_description=README + '\n\n' + CHANGES,
     author="SciELO",
