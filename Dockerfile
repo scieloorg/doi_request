@@ -11,4 +11,3 @@ RUN chmod -R 755 /app/*
 WORKDIR /app
 
 RUN python setup.py install
-RUN python setup.py compile_catalog
