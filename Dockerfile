@@ -10,3 +10,4 @@ RUN chmod -R 755 /app/*
 WORKDIR /app
 
 RUN python setup.py install
+RUN alembic upgrade head
