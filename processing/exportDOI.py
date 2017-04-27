@@ -93,10 +93,6 @@ class ExportDOI(object):
                     collection=self.collection, issn=issn,
                     from_date=self.from_date):
 
-                count += 1
-                if count >= 500:
-                    break
-
                 self._depositor.deposit(document)
 
 
