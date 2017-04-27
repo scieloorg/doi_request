@@ -1,8 +1,6 @@
 import re
 import logging
-import weakref
 import re
-import os
 
 try:
     from configparser import ConfigParser
