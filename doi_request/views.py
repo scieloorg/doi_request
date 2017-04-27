@@ -66,6 +66,7 @@ def list_deposits(request):
     data['page'] = int((request.session['offset']/LIMIT)+1)
     data['pagination_ruler'] = pagination_ruler(LIMIT, total, request.session['offset'])
     data['total_pages'] = int((total/LIMIT)+1)
+    data['navbar_active'] = 'deposits'
 
     return data
 
@@ -73,14 +74,13 @@ def list_deposits(request):
 @check_session
 @base_data_manager
 def deposit(request):
-
     data = request.data_manager
 
     code = request.matchdict['deposit_item_code']
 
-    try:
-        deposit = request.db.query(Deposit).filter(Deposit.code == code).first()
-    except IndexError:
+    deposit = request.db.query(Deposit).filter(Deposit.code == code).first()
+
+    if not deposit:
         raise exc.HTTPNotFound()
 
     data['deposit'] = deposit
@@ -89,15 +89,29 @@ def deposit(request):
 
     return data
 
-@view_config(route_name='post_deposit')
-def post_deposit(request):
+@view_config(route_name='deposit_request', renderer='templates/deposit_request.mako')
+@check_session
+@base_data_manager
+def deposit_request(request):
 
-    code = request.matchdict['deposit_item_code']
-    collection, pid = code.split('_')
+    data = request.data_manager
 
-    depositor.deposit_by_pid(pid, collection)
+    data['navbar_active'] = 'deposit_request'
 
-    return HTTPFound('/deposit/%s' % code)
+    return data
+
+
+@view_config(route_name='deposit_post')
+def deposit_post(request):
+
+    pids = request.GET.get('pids', '')
+    for ndx, item in enumerate(pids.split('\r')):
+        if ndx > 9:
+            break
+        collection, pid = item.split('_')
+        depositor.deposit_by_pid(pid.strip(), collection.strip())
+
+    return HTTPFound('/')
 
 @view_config(route_name='help', renderer='templates/help.mako')
 @check_session

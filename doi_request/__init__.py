@@ -47,8 +47,9 @@ def main(global_config, **settings):
     config.add_static_view('static', 'static', cache_max_age=3600)
     config.add_route('list_deposits', '/')
     config.add_route('help', '/help')
+    config.add_route('deposit_request', '/deposit/request')
+    config.add_route('deposit_post', '/deposit/post')
     config.add_route('deposit', '/deposit/{deposit_item_code}')
-    config.add_route('post_deposit', '/deposit/post/{deposit_item_code}')
 
     config.add_subscriber('doi_request.subscribers.add_renderer_globals',
                           'pyramid.events.BeforeRender')

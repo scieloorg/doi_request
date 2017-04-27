@@ -97,7 +97,7 @@
             <th class="visible-md visible-lg">${_(u'referências válidas')}</th>
             <th>${_(u'situação de submissão')}</th>
             <th>${_(u'situação de depósito')}</th>
-            <th class="visible-md visible-lg">${_(u'funções')}</th>
+            <th class="visible-md visible-lg" width="200px">${_(u'funções')}</th>
           </tr>
         </thead>
         <tbody>
@@ -115,11 +115,11 @@
               <td>
                 <span class="label label-${status_to_template[item.feedback_status or 'unknow'][0]}">${item.feedback_status or ''}</span>
               </td>
-              <td class="visible-md visible-lg">
+              <td class="visible-md visible-lg" width="200px">
               <a href="${request.route_url('deposit', deposit_item_code=item.code)}">
                 <button type="button" class="btn btn-primary btn-sm"><i class="fa fa-folder-open"></i> ${_(u'detalhes')}</button>
               </a>
-              <a href="${request.route_url('post_deposit', deposit_item_code=item.code)}">
+              <a href="${request.route_url('deposit_post')}?pids=${item.code}">
                 <button type="button" class="btn btn-primary btn-sm"><i class="fa fa-cloud-upload"></i> ${_(u'resubmeter')}</button>
               </a>
               </td>

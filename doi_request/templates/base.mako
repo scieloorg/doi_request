@@ -18,78 +18,69 @@
 <link rel="stylesheet" href="/static/codemirror/css/codemirror.css">  
 <%block name="stylesheet" />
   </head>
-  <body class="hold-transition skin-blue fixed sidebar-mini">
+  <body class="hold-transition skin-blue layout-top-nav">
     <!-- Site wrapper -->
     <div class="wrapper">
       <header class="main-header">
-        <!-- Logo -->
-        <a href="${request.route_url('list_deposits')}" class="logo">
-          <span class="logo-mini">DOI</span>
-          <span class="logo-lg">SciELO DOI Manager</span>
-        </a>
-        <!-- Header Navbar: style can be found in header.less -->
         <nav class="navbar navbar-static-top">
-          <div class="navbar-custom-menu">
-            <ul class="nav navbar-nav">
-              <li class="dropdown messages-menu">
-                <a href="#" class="dropdown-toggle" data-toggle="dropdown" aria-expanded="false">
-                  <i class="fa fa-gears"></i>
-                </a>
-                <ul class="dropdown-menu">
-                  <li class="header">Settings</li>
-                  <li>
-                  <li class="content"><!-- start message -->
-                      <dt>${_(u'Prefixo no Crossref')}</dt>
-                      <dd>${crossref_prefix}</dd>
-                      <dt>${_(u'Usuário no Crossref')}</dt>
-                      <dd>${crossref_user_api}</dd>
-                      <dt>${_(u'Nome do depositante')}</dt>
-                      <dd>${crossref_depositor_name}</dd>
-                      <dt>${_(u'E-mail do depositante')}</dt>
-                      <dd>${crossref_depositor_email}</dd>
-                  </li>
-                </ul>
-              </li>
-            </ul>
-          </div>
+            <div class="navbar-header">
+              <a href="${request.route_url('list_deposits')}" class="navbar-brand"><b>SciELO</b> DOI Manager</a>
+              <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar-collapse"><i class="fa fa-bars"></i></button>
+            </div>
+            <div class="collapse navbar-collapse pull-left" id="navbar-collapse">
+              <ul class="nav navbar-nav">
+                <li class="${'active' if navbar_active == 'deposits' else ''}">
+                  <a href="${request.route_url('list_deposits')}">
+                    <i class="fa fa-cloud"></i> <span> ${_(u'Depósitos')}</span>
+                  </a>
+                </li>
+                <li class="${'active' if navbar_active == 'deposit_request' else ''}">
+                  <a href="${request.route_url('deposit_request')}">
+                    <i class="fa fa-cloud-upload"></i> <span> ${_(u'Depositar')}</span>
+                  </a>
+                </li>
+              </ul>
+              <form action="${request.route_url('list_deposits')}" method="get" class="navbar-form navbar-left" role="search">
+                <div class="input-group">
+                  <input type="text" name="filter_pid_doi" id="navbar-search-input" class="form-control" placeholder="${_(u'pesquise por DOI ou PID')}">
+                </div>
+              </form>
+            </div>
+            <div class="navbar-custom-menu">
+              <ul class="nav navbar-nav">
+                <li class="dropdown messages-menu">
+                  <a href="#" class="dropdown-toggle" data-toggle="dropdown">
+                    <i class="fa fa-gears"></i>
+                  </a>
+                  <ul class="dropdown-menu">
+                    <li class="header">Settings</li>
+                    <li>
+                      <ul class="menu">
+                        <li class="content"><!-- start message -->
+                          <dt>${_(u'Prefixo no Crossref')}</dt>
+                          <dd>${crossref_prefix}</dd>
+                          <dt>${_(u'Usuário no Crossref')}</dt>
+                          <dd>${crossref_user_api}</dd>
+                          <dt>${_(u'Nome do depositante')}</dt>
+                          <dd>${crossref_depositor_name}</dd>
+                          <dt>${_(u'E-mail do depositante')}</dt>
+                          <dd>${crossref_depositor_email}</dd>
+                        </li>
+                      </ul>
+                    </li>
+                  </ul>
+                </li>
+              </ul>
+            </div>
         </nav>
       </header>
-      <!-- Left side column. contains the sidebar -->
-      <aside class="main-sidebar">
-        <!-- sidebar: style can be found in sidebar.less -->
-        <section class="sidebar">
-          <form action="${request.route_url('list_deposits')}" method="get" class="sidebar-form">
-            <div class="input-group">
-              <input type="text" name="filter_pid_doi" class="form-control" placeholder="${_(u'pesquise por DOI ou PID')}">
-                  <span class="input-group-btn">
-                    <button type="submit" id="search-btn" class="btn btn-flat"><i class="fa fa-search"></i>
-                    </button>
-                  </span>
-            </div>
-          </form>
-          <!-- /.search form -->
-          <ul class="sidebar-menu">
-            <li>
-              <a href="${request.route_url('list_deposits')}">
-                <i class="fa fa-cloud-upload"></i> <span> ${_(u'Depósitos')}</span>
-              </a>
-            </li>
-            <li>
-              <a href="${request.route_url('help')}">
-                <i class="fa fa-question-circle"></i> <span> ${_(u'Ajuda')}</span>
-              </a>
-            </li>
-          </ul>
-        </section>
-        <!-- /.sidebar -->
-      </aside>
       <!-- Content Wrapper. Contains page content -->
       <div class="content-wrapper">
-        <!-- Main content -->
-        <section class="content">
-          <%block name="central_container" />
-        </section>
-        <!-- /.content -->
+          <!-- Main content -->
+          <section class="content">
+            <%block name="central_container" />
+          </section>
+          <!-- /.content -->
       </div>
       <!-- /.content-wrapper -->
       <footer class="main-footer">
