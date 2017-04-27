@@ -16,7 +16,7 @@ from sqlalchemy import create_engine
 
 from doi_request.models import initialize_sql
 from doi_request.controller import Depositor
-import utils
+from processing import utils
 
 logger = logging.getLogger(__name__)
 
