@@ -119,7 +119,7 @@
               <a href="${request.route_url('deposit', deposit_item_code=item.code)}">
                 <button type="button" class="btn btn-primary btn-sm"><i class="fa fa-folder-open"></i> ${_(u'detalhes')}</button>
               </a>
-              <a href="${request.route_url('deposit_post')}?pids=${item.code}">
+              <a href="${request.route_url('deposit_post')}?pids=${item.pid}">
                 <button type="button" class="btn btn-primary btn-sm"><i class="fa fa-cloud-upload"></i> ${_(u'resubmeter')}</button>
               </a>
               </td>

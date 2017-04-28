@@ -38,7 +38,7 @@
       </div>
       <div class="row">
         <div class="col-md-12 col-sm-24 col-xs-48">
-          <a href="${request.route_url('deposit_post')}?pids=${deposit.code}">
+          <a href="${request.route_url('deposit_post')}?pids=${deposit.pid}">
             <button type="button" class="btn btn-primary btn-sm pull-right"><i class="fa fa-cloud-upload"></i> ${_(u'resubmeter')}</button>
           </a>
         </div>
