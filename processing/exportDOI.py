@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 FROM = datetime.now() - timedelta(days=30)
 FROM = FROM.isoformat()[:10]
+UNTIL = datetime.now().isoformat()[:10]
 
 SENTRY_HANDLER = os.environ.get('SENTRY_HANDLER', None)
 LOGGING_LEVEL = os.environ.get('LOGGING_LEVEL', 'DEBUG')
@@ -76,13 +77,14 @@ initialize_sql(engine)
 class ExportDOI(object):
 
     def __init__(self, collection, issns=None, output_file=None, from_date=FROM,
-                 prefix=None, api_user=None, api_key=None, depositor_name=None,
-                 depositor_email=None, test_mode=False):
+                 until_date=UNTIL, prefix=None, api_user=None, api_key=None,
+                 depositor_name=None, depositor_email=None, test_mode=False):
 
         self._articlemeta = ThriftClient(domain=os.environ.get('ARTICLEMETA_THRIFTSERVER', 'articlemeta.scielo.org:11621'))
         self._depositor = Depositor(prefix=prefix, api_user=api_user, api_key=api_key, depositor_name=depositor_name, depositor_email=depositor_email, test_mode=test_mode)
         self.collection = collection
         self.from_date = from_date
+        self.until_date = until_date
         self.issns = issns or [None]
 
     def run(self):
@@ -91,7 +93,7 @@ class ExportDOI(object):
         for issn in self.issns:
             for document in self._articlemeta.documents(
                     collection=self.collection, issn=issn,
-                    from_date=self.from_date):
+                    from_date=self.from_date, until_date=self.until_date):
 
                 self._depositor.deposit(document)
 
@@ -171,6 +173,13 @@ def main():
     )
 
     parser.add_argument(
+        '--until_date',
+        '-g',
+        default=UNTIL,
+        help='ISO date like %s' % UNTIL
+    )
+
+    parser.add_argument(
         '--logging_level',
         '-l',
         default=LOGGING_LEVEL,
@@ -201,8 +210,8 @@ def main():
         issns = issns_from_file if issns_from_file else []
 
     export = ExportDOI(
-        args.collection, issns, from_date=args.from_date, prefix=args.prefix,
-        api_user=args.api_user, api_key=args.api_key,
+        args.collection, issns, from_date=args.from_date, until_date=args.until_date,
+        prefix=args.prefix, api_user=args.api_user, api_key=args.api_key,
         depositor_name=args.depositor_name, depositor_email=args.depositor_email,
         test_mode=args.test_mode)
 
