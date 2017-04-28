@@ -164,6 +164,7 @@ class Depositor(object):
             logevent.status = 'info'
             logevent.deposit_code = depitem.code
             DBSession.add(logevent)
+            DBSession.commit()
             xml = self._articlemeta.document(document.publisher_id, document.collection_acronym, fmt='xmlcrossref')
         except Exception as exc:
             logger.exception(exc)
@@ -180,8 +181,8 @@ class Depositor(object):
             logevent.status = 'error'
             logevent.deposit_code = depitem.code
             DBSession.add(logevent)
+            DBSession.commit()
             return
-        DBSession.commit()
 
         is_valid, parsed_xml, exc = self.xml_is_valid(xml)
         depitem.submission_xml = etree.tostring(parsed_xml, encoding='utf-8', pretty_print=True).decode('utf-8')
@@ -211,7 +212,7 @@ class Depositor(object):
 
         log_title = 'XML with references is invalid, fail to parse xml for document (%s)' % code
         now = datetime.now()
-        logger.error(log_title)
+        logger.warning(log_title)
         depitem.is_xml_valid = False
         depitem.submission_status = 'error'
         depitem.submission_updated_at = now
@@ -227,7 +228,7 @@ class Depositor(object):
 
         log_title = 'Trying to send XML without references'
         now = datetime.now()
-        logger.error(log_title)
+        logger.debug(log_title)
         logevent = LogEvent()
         logevent.title = log_title
         logevent.type = 'submission'
