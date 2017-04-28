@@ -89,6 +89,8 @@ class ExportDOI(object):
 
     def run(self):
 
+        logger.info('Date range (%s) to (%s)',  self.from_date, self.until_date)
+
         count = 0
         for issn in self.issns:
             for document in self._articlemeta.documents(
@@ -180,6 +182,13 @@ def main():
     )
 
     parser.add_argument(
+        '--date_range',
+        '-r',
+        type=int,
+        help='Days from the current date to setup the processing date range. It will overwrite any definition of the arguments from_date and until_date'
+    )
+
+    parser.add_argument(
         '--logging_level',
         '-l',
         default=LOGGING_LEVEL,
@@ -208,6 +217,11 @@ def main():
         issns += issns_from_file if issns_from_file else []
     else:
         issns = issns_from_file if issns_from_file else []
+
+    if args.date_range:
+        from_date = datetime.now() - timedelta(days=args.date_range)
+        args.from_date = from_date.isoformat()[:10]
+        args.until_date = datetime.now().isoformat()[:10]
 
     export = ExportDOI(
         args.collection, issns, from_date=args.from_date, until_date=args.until_date,
