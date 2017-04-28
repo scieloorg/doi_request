@@ -88,7 +88,7 @@ class ExportDOI(object):
         self.issns = issns or [None]
 
     def run(self):
-
+        logger.info('Processing Started')
         logger.info('Date range (%s) to (%s)',  self.from_date, self.until_date)
 
         count = 0
@@ -98,6 +98,8 @@ class ExportDOI(object):
                     from_date=self.from_date, until_date=self.until_date):
 
                 self._depositor.deposit(document)
+
+        logger.info('Processing Finished')
 
 
 def main():
