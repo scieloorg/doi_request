@@ -102,14 +102,17 @@ def deposit_request(request):
 
 
 @view_config(route_name='deposit_post')
+@base_data_manager
 def deposit_post(request):
 
+    data = request.data_manager
+
     pids = request.GET.get('pids', '')
-    for ndx, item in enumerate(pids.split('\r')):
+
+    for ndx, pid in enumerate(pids.split('\r')):
         if ndx > 9:
             break
-        collection, pid = item.split('_')
-        depositor.deposit_by_pid(pid.strip(), collection.strip())
+        depositor.deposit_by_pid(pid.strip(), data['collection_acronym'])
 
     return HTTPFound('/')
 

@@ -81,6 +81,7 @@ def base_data_manager(wrapped):
         data['crossref_user_api'] = os.environ.get('CROSSREF_API_USER', 'não definido')
         data['crossref_depositor_name'] = os.environ.get('CROSSREF_DEPOSITOR_NAME', 'não definido')
         data['crossref_depositor_email'] = os.environ.get('CROSSREF_DEPOSITOR_EMAIL', 'não definido')
+        data['collection_acronym'] = os.environ.get('COLLECTION_ACRONYM', 'não definido')
         data['version'] = request.version()
         data['locale'] = request.session['_LOCALE_']
 

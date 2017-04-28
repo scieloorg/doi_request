@@ -261,7 +261,7 @@ class Depositor(object):
             )
             return
 
-        log_title = 'XML on with front metadata is also invalid, fail to parse xml for document (%s)' % code
+        log_title = 'XML only with front metadata is also invalid, fail to parse xml for document (%s)' % code
         now = datetime.now()
         logger.error(log_title)
         depitem.is_xml_valid = False

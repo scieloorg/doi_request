@@ -15,7 +15,7 @@
   <form action="${request.route_url('deposit_post')}" method="get" role="form">
     <div class="form-group">
       <label>${_('lista de PIDs (máximo 10, demais serão desconsiderados)')}</label>
-      <textarea name="pids" rows="10" class="form-control" placeholder="${_(u'lista de pids ex: scl_S0102-69092006000200003')}"></textarea>
+      <textarea name="pids" rows="10" class="form-control" placeholder="${_(u'lista de pids ex: S0102-69092006000200003')}"></textarea>
     </div>
     <button type="submit" class="btn btn-primary btn-sm"><i class="fa fa-cloud-upload"></i> ${_(u'submeter')}</button>
   </form>
