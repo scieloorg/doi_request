@@ -50,7 +50,7 @@ REGISTER_DOI_DELAY_RETRY_TD = timedelta(seconds=REGISTER_DOI_DELAY_RETRY)
 REQUEST_DOI_DELAY_RETRY_TD = timedelta(seconds=REQUEST_DOI_DELAY_RETRY)
 
 
-@app.task(bind=True, default_retry_delay=REGISTER_DOI_DELAY_RETRY, retry_kwargs={'max_retries': 100})
+@app.task(bind=True, default_retry_delay=REGISTER_DOI_DELAY_RETRY, max_retries=100)
 def register_doi(self, code, xml):
     deposit = DBSession.query(Deposit).filter_by(code=code).first()
 
@@ -135,7 +135,7 @@ def register_doi(self, code, xml):
     DBSession.commit()
     return (False, code)
 
-@app.task(bind=True, default_retry_delay=REQUEST_DOI_DELAY_RETRY, retry_kwargs={'max_retries': 200})
+@app.task(bind=True, default_retry_delay=REQUEST_DOI_DELAY_RETRY, max_retries=200)
 def request_doi_status(self, deposit, doi_batch_id):
     is_doi_register_submitted, code = deposit
     deposit = DBSession.query(Deposit).filter_by(code=code).first()
