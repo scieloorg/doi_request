@@ -6,10 +6,9 @@ from pyramid.view import view_config
 import pyramid.httpexceptions as exc
 from mongoengine.queryset.visitor import Q
 
-from sqlalchemy import or_
-from sqlalchemy import desc
+from sqlalchemy import desc, func, or_
 
-from doi_request.models.depositor import Deposit
+from doi_request.models.depositor import Deposit, Expenses
 from doi_request.models import DBSession
 from doi_request import template_choices
 from doi_request import controller
@@ -51,7 +50,8 @@ def list_deposits(request):
     total = deposits.count()
     deposits = deposits.order_by(desc('started_at')).limit(LIMIT).offset(request.session['offset'])
     data['deposits'] = deposits
-    data['status_to_template'] = template_choices.STATUS_TO_TEMPLATE
+    data['submission_status_to_template'] = template_choices.SUBMISSION_STATUS_TO_TEMPLATE
+    data['feedback_status_to_template'] = template_choices.FEEDBACK_STATUS_TO_TEMPLATE
     data['filter_from_date'] = from_date
     data['filter_to_date'] = to_date
     data['filter_feedback_status'] = request.session['filter_feedback_status']
@@ -76,7 +76,7 @@ def list_deposits(request):
 def deposit(request):
     data = request.data_manager
 
-    code = request.matchdict['deposit_item_code']
+    code = request.GET.get('code', '')
 
     deposit = request.db.query(Deposit).filter(Deposit.code == code).first()
 
@@ -85,7 +85,8 @@ def deposit(request):
 
     data['deposit'] = deposit
     data['timeline'] = deposit.timeline
-    data['status_to_template'] = template_choices.STATUS_TO_TEMPLATE
+    data['submission_status_to_template'] = template_choices.SUBMISSION_STATUS_TO_TEMPLATE
+    data['feedback_status_to_template'] = template_choices.FEEDBACK_STATUS_TO_TEMPLATE
 
     return data
 
@@ -100,6 +101,25 @@ def deposit_request(request):
 
     return data
 
+@view_config(route_name='expenses', renderer='templates/expenses.mako')
+@check_session
+@base_data_manager
+def expenses(request):
+
+    data = request.data_manager
+
+    expenses = request.db.query(Expenses)
+
+    expenses = request.db.query(
+        func.date_trunc('month', Expenses.registry_date).label('registry_month'),
+        func.sum(Expenses.cost
+    ).label('total')).group_by('registry_month')
+
+    data['navbar_active'] = 'expenses'
+    data['expenses'] = expenses
+    data['offset'] = request.session['offset']
+
+    return data
 
 @view_config(route_name='deposit_post')
 @base_data_manager

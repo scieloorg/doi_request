@@ -39,6 +39,11 @@
                     <i class="fa fa-cloud-upload"></i> <span> ${_(u'Depositar')}</span>
                   </a>
                 </li>
+                <li class="${'active' if navbar_active == 'expenses' else ''}">
+                  <a href="${request.route_url('expenses')}">
+                    <i class="fa fa-dollar"></i> <span> ${_(u'Custos')}</span>
+                  </a>
+                </li>
               </ul>
               <form action="${request.route_url('list_deposits')}" method="get" class="navbar-form navbar-left" role="search">
                 <div class="input-group">

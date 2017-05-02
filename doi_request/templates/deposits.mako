@@ -1,6 +1,7 @@
 <%inherit file="base.mako"/>
 
 <%block name="central_container">
+  <h3>${_(u'Depósitos')}</h3>
   <div class="box box-primary collapsed-box">
     <div class="box-header with-border">
       <h3 class="box-title">${_('Filtros')}</h3>
@@ -35,7 +36,7 @@
           <label>${_(u'Situação de submissão')}</label>
           <select name="filter_submission_status" class="form-control">
             <option value="" ${'selected' if filter_submission_status == '' else ''}>${_(u'todos')}</option>
-            % for item in status_to_template:
+            % for item in submission_status_to_template:
               <option value="${item}" ${'selected' if filter_submission_status == item else ''}>${item}</option>
             % endfor
           </select>
@@ -44,7 +45,7 @@
           <label>${_(u'Situação de depósito')}</label>
           <select name="filter_feedback_status" class="form-control">
             <option value="" ${'selected' if filter_feedback_status == '' else ''}>${_(u'todos')}</option>
-            % for item in status_to_template:
+            % for item in feedback_status_to_template:
               <option value="${item}" ${'selected' if filter_feedback_status == item else ''}>${item}</option>
             % endfor
           </select>
@@ -106,17 +107,17 @@
               <td class="visible-md visible-lg">${offset+ndx+1}</td>
               <td class="visible-md visible-lg">${item.started_at.strftime('%Y-%m-%d %H:%M:%S')}</td>
               <td><span class="visible-md visible-lg">${item.journal}</span> (${item.journal_acronym.upper()}) (${item.issue_label})</td>
-              <td><a href="${request.route_url('deposit', deposit_item_code=item.code)}">${item.code}</a></td>
+              <td><a href="${request.route_url('deposit')}?code=${item.code}">${item.code}</a></td>
               <td class="visible-md visible-lg">${item.prefix}</td>
               <td class="visible-md visible-lg">${item.has_submission_xml_valid_references}</td>
               <td>
-                <span class="label label-${status_to_template[item.submission_status or 'unknow'][0]}">${item.submission_status}</span>
+                <span class="label label-${submission_status_to_template[item.submission_status or 'unknow'][0]}">${item.submission_status}</span>
               </td>
               <td>
-                <span class="label label-${status_to_template[item.feedback_status or 'unknow'][0]}">${item.feedback_status or ''}</span>
+                <span class="label label-${feedback_status_to_template[item.feedback_status or 'unknow'][0]}">${item.feedback_status or ''}</span>
               </td>
               <td class="visible-md visible-lg" width="200px">
-              <a href="${request.route_url('deposit', deposit_item_code=item.code)}">
+              <a href="${request.route_url('deposit')}?code=${item.code}">
                 <button type="button" class="btn btn-primary btn-sm"><i class="fa fa-folder-open"></i> ${_(u'detalhes')}</button>
               </a>
               <a href="${request.route_url('deposit_post')}?pids=${item.pid}">

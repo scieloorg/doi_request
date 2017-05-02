@@ -48,8 +48,9 @@ def main(global_config, **settings):
     config.add_route('list_deposits', '/')
     config.add_route('help', '/help')
     config.add_route('deposit_request', '/deposit/request')
+    config.add_route('expenses', '/expenses')
     config.add_route('deposit_post', '/deposit/post')
-    config.add_route('deposit', '/deposit/{deposit_item_code}')
+    config.add_route('deposit', '/deposit')
 
     config.add_subscriber('doi_request.subscribers.add_renderer_globals',
                           'pyramid.events.BeforeRender')

@@ -107,6 +107,7 @@ class Depositor(object):
             collection_acronym=document.collection_acronym,
             xml_file_name=xml_file_name,
             doi=document.doi,
+            publication_year=int(document.publication_date[0:4]),
             prefix=doi_prefix,
             has_submission_xml_valid_references=False,
             submission_updated_at=now,

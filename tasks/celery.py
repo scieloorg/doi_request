@@ -231,3 +231,15 @@ def request_doi_status(self, deposit, doi_batch_id):
     logevent.deposit_code = deposit.code
     DBSession.add(logevent)
     DBSession.commit()
+
+    if feedback_status == 'success' and 'added' in feedback_body.lower():
+        #crossref backfiles limit current year - 2.
+        back_file_limit = int(datetime.now().strftime('%Y')) - 2
+        expenses = Expenses()
+        expenses.publication_year = deposit.publication_year
+        expenses.registry_date = datetime.now()
+        expenses.doi = deposit.doi
+        expenses.cost = 0.25 if int(deposit.publication_year) < back_file_limit else 1
+        expenses.retro = True if int(deposit.publication_year) < back_file_limit else False
+        DBSession.add(expenses)
+        DBSession.commit()

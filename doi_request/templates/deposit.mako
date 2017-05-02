@@ -25,13 +25,13 @@
         </div>
         <div class="col-md-4 col-sm-8 col-xs-16">
           <strong>${_(u'Situação de submissão')}</strong>
-          <p><span class="label label-${status_to_template[deposit.submission_status or 'unknow'][0]}">${deposit.submission_status or 'unknow'}</span></p>
+          <p><span class="label label-${submission_status_to_template[deposit.submission_status or 'unknow'][0]}">${deposit.submission_status or 'unknow'}</span></p>
           <strong>${_(u'Atualizado em')}</strong>
           <p>${deposit.submission_updated_at}</p>
         </div>
         <div class="col-md-4 col-sm-8 col-xs-16">
           <strong>${_(u'Situação de depósito')}</strong>
-          <p><span class="label label-${status_to_template[deposit.feedback_status or 'unknow'][0]}">${deposit.feedback_status or 'unknow'}</span></p>
+          <p><span class="label label-${feedback_status_to_template[deposit.feedback_status or 'unknow'][0]}">${deposit.feedback_status or 'unknow'}</span></p>
           <strong>${_(u'Atualizado em')}</strong>
           <p>${deposit.feedback_updated_at}</p>
         </div>

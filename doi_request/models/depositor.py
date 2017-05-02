@@ -15,6 +15,7 @@ class Deposit(Base):
     journal = Column('journal', String(256), nullable=False, index=True)
     journal_acronym = Column('journal_acronym', String(16), nullable=False, index=True)
     collection_acronym = Column('collection_acronym', String(3), nullable=False)
+    publication_year = Column('publication_year', Integer, index=True)
     xml_file_name = Column('xml_file_name', String(32), nullable=False)
     prefix = Column('prefix', String(16), nullable=False, index=True)
     doi = Column('doi', String(128), index=True)
@@ -47,3 +48,13 @@ class LogEvent(Base):
     status = Column('status', String(16))
     deposit_code = Column('deposit_code', ForeignKey('deposit.code'))
     deposit = relationship("Deposit", back_populates="log_events")
+
+
+class Expenses(Base):
+    __tablename__ = 'expenses'
+    id = Column(Integer, primary_key=True)
+    retro = Column('retro', Boolean, index=True)
+    publication_year = Column('publication_year', Integer, index=True)
+    registry_date = Column('registry_date', DateTime(timezone=True), default=datetime.utcnow, server_default=func.now())
+    doi = Column('doi', String(128), index=True)
+    cost = Column('cost', Integer, nullable=False)
