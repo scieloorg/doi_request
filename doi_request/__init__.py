@@ -49,6 +49,7 @@ def main(global_config, **settings):
     config.add_route('help', '/help')
     config.add_route('deposit_request', '/deposit/request')
     config.add_route('expenses', '/expenses')
+    config.add_route('expenses_details', '/expenses/details')
     config.add_route('deposit_post', '/deposit/post')
     config.add_route('deposit', '/deposit')
 

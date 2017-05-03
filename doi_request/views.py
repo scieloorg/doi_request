@@ -87,6 +87,7 @@ def deposit(request):
     data['timeline'] = deposit.timeline
     data['submission_status_to_template'] = template_choices.SUBMISSION_STATUS_TO_TEMPLATE
     data['feedback_status_to_template'] = template_choices.FEEDBACK_STATUS_TO_TEMPLATE
+    data['timeline_status_to_template'] = template_choices.TIMELINE_STATUS_TO_TEMPLATE
 
     return data
 
@@ -117,7 +118,25 @@ def expenses(request):
 
     data['navbar_active'] = 'expenses'
     data['expenses'] = expenses
+
+    return data
+
+@view_config(route_name='expenses_details', renderer='templates/expenses_details.mako')
+@check_session
+@base_data_manager
+def expenses_details(request):
+
+    data = request.data_manager
+
+    period = request.GET.get('period', datetime.now().isoformat())
+    period = datetime.strptime(period[0:10], '%Y-%m-%d')
+
+    expenses = request.db.query(Expenses)
+
+    data['navbar_active'] = 'expenses'
+    data['expenses'] = expenses
     data['offset'] = request.session['offset']
+    data['period'] = period
 
     return data
 

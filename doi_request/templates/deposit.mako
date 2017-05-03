@@ -65,7 +65,7 @@
           </li>
         % for event in deposit.timeline:
           <li>
-            <i class="fa ${status_to_template[event.status or 'unknow'][2]} bg-${status_to_template[event.status or 'unknow'][1]}"></i>
+            <i class="fa ${feedback_status_to_template[event.status or 'unknow'][2]} bg-${timeline_status_to_template[event.status or 'unknow'][1]}"></i>
             <div class="timeline-item">
               <span class="time">
                 <i class="fa fa-clock-o"></i>

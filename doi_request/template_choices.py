@@ -17,3 +17,5 @@ SUBMISSION_STATUS_TO_TEMPLATE = {
     'info': ('waiting', 'gray', 'fa-info'),
     'notapplicable': ('default', 'gray', 'fa-info')
 }
+
+TIMELINE_STATUS_TO_TEMPLATE = {**FEEDBACK_STATUS_TO_TEMPLATE, **SUBMISSION_STATUS_TO_TEMPLATE}

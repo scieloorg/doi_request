@@ -9,7 +9,7 @@ from celery.utils.log import get_task_logger
 from lxml import etree
 
 from crossref.client import CrossrefClient
-from doi_request.models.depositor import Deposit, LogEvent
+from doi_request.models.depositor import Deposit, LogEvent, Expenses
 from doi_request.models import configure_session_engine, DBSession
 
 
