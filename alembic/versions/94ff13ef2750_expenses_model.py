@@ -20,19 +20,11 @@ depends_on = None
 
 def upgrade():
 
-    op.add_column('deposit', sa.Column('publication_year', sa.Integer, index=True))
-
-    op.create_table(
-        'expenses',
-        sa.Column('id', sa.Integer, primary_key=True),
-        sa.Column('retro', sa.Boolean, nullable=False, index=True),
-        sa.Column('publication_year', sa.Integer, index=True),
-        sa.Column('registry_date', sa.DateTime(timezone=True), default=datetime.utcnow, server_default=sa.func.now()),
-        sa.Column('doi', sa.String(128), index=True),
-        sa.Column('cost', sa.Float, nullable=False)
-    )
+    op.alter_column('eventlog', sa.Column('date', sa.DateTime(timezone=True)))
+    op.alter_column('expenses', sa.Column('registry_date', sa.DateTime(timezone=True)))
 
 
 def downgrade():
-    op.drop_column('deposit', 'publication_year')
-    op.drop_table('expenses')
+
+    op.alter_column('eventlog', sa.Column('date', sa.DateTime(timezone=True), nullable=False, default=datetime.utcnow, server_default=func.now()))
+    op.alter_column('expenses', sa.Column('registry_date', sa.DateTime(timezone=True), default=datetime.utcnow, server_default=func.now()))
