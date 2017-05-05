@@ -1,12 +1,13 @@
 from datetime import datetime
 from datetime import timedelta
+import calendar
 
 from pyramid.httpexceptions import HTTPFound
 from pyramid.view import view_config
 import pyramid.httpexceptions as exc
 from mongoengine.queryset.visitor import Q
 
-from sqlalchemy import desc, func, or_
+from sqlalchemy import desc, func, or_, and_
 
 from doi_request.models.depositor import Deposit, Expenses
 from doi_request.models import DBSession
@@ -31,9 +32,18 @@ def list_deposits(request):
     from_date_dt = datetime.strptime(request.session['filter_start_range'].split('-')[0].strip(), '%m/%d/%Y')
     total = 0
     if filter_pid_doi:
-        deposits = request.db.query(Deposit).filter(or_(Deposit.doi == filter_pid_doi, Deposit.pid == filter_pid_doi))
+        deposits = request.db.query(
+            Deposit.started_at,
+            Deposit.journal,
+            Deposit.journal_acronym,
+            Deposit.code,
+            Deposit.prefix,
+            Deposit.has_submission_xml_valid_references,
+            Deposit.feedback_status,
+            Deposit.submission_status
+        ).filter(or_(Deposit.doi == filter_pid_doi, Deposit.pid == filter_pid_doi))
     else:
-        deposits = request.db.query(Deposit).filter(or_(Deposit.started_at >= from_date_dt, Deposit.started_at <= to_date_dt))
+        deposits = request.db.query(Deposit).filter(and_(Deposit.started_at >= from_date_dt, Deposit.started_at <= to_date_dt))
         if request.session['filter_feedback_status']:
             deposits = deposits.filter(Deposit.feedback_status == request.session['filter_feedback_status'])
         if request.session['filter_submission_status']:
@@ -114,8 +124,8 @@ def expenses(request):
 
     expenses = request.db.query(
         func.date_trunc('month', Expenses.registry_date).label('registry_month'),
-        func.sum(Expenses.cost
-    ).label('total')).group_by('registry_month')
+        func.sum(Expenses.cost).label('total')
+    ).group_by('registry_month').order_by(desc('registry_month'))
 
     data['navbar_active'] = 'expenses'
     data['expenses'] = expenses
@@ -130,12 +140,19 @@ def expenses_details(request):
     data = request.data_manager
 
     period = request.GET.get('period', datetime.now().isoformat())
-    period = datetime.strptime(period[0:10], '%Y-%m-%d')
+    period = datetime.strptime(period[0:7], '%Y-%m')
 
-    expenses = request.db.query(Expenses)
+    week_day, last_day = calendar.monthrange(period.year, period.month)
+    from_date_dt = period
+    to_date_dt = datetime(period.year, period.month, last_day)
+
+    expenses = request.db.query(Expenses).filter(
+        and_(Expenses.registry_date >= from_date_dt, Expenses.registry_date <= to_date_dt)
+    )
 
     total = expenses.count()
     request.session['expenses_offset'] = request.session['expenses_offset'] if request.session['expenses_offset'] < total else 0
+    expenses = expenses.order_by(desc('registry_date')).limit(LIMIT).offset(request.session['expenses_offset'] )
     data['navbar_active'] = 'expenses'
     data['expenses'] = expenses
     data['offset'] = request.session['expenses_offset']

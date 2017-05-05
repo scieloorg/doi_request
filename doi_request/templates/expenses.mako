@@ -15,7 +15,7 @@
           <td>${item[0].strftime('%B %Y')}</td>
           <td>$ ${format(item[1], '.2f')}</td>
           <td>
-            <a href="${request.route_url('expenses_details')}?period=${item[0]}">
+            <a href="${request.route_url('expenses_details')}?period=${item[0].strftime('%Y-%m')}">
               <button type="button" class="btn btn-primary btn-sm"><i class="fa fa-cloud-upload"></i> ${_(u'detalhes')}</button>
             </a>
           </td>

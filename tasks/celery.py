@@ -160,7 +160,6 @@ class CallbackTask(Task):
         DBSession.add(logevent)
         DBSession.commit()
 
-        print('Fabio failure')
 
 @app.task(base=CallbackTask, bind=True, default_retry_delay=REQUEST_DOI_DELAY_RETRY, max_retries=200)
 def request_doi_status(self, deposit, doi_batch_id):
