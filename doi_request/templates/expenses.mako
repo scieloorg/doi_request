@@ -15,9 +15,9 @@
       % for key, item in expenses.items():
         <tr>
           <td>${key}</td>
-          <td>$ ${format(item['total'], '.2f')}</td>
           <td>$ ${format(item['retro'], '.2f')}</td>
           <td>$ ${format(item['new'], '.2f')}</td>
+          <td>$ ${format(item['total'], '.2f')}</td>
           <td>
             <a href="${request.route_url('expenses_details')}?period=${key}">
               <button type="button" class="btn btn-primary btn-sm"><i class="fa fa-cloud-upload"></i> ${_(u'detalhes')}</button>

@@ -138,10 +138,10 @@ def expenses(request):
         })
 
         if item['retro'] is True:
-            result[key]['retro'] = item['total']
+            result[key]['retro'] += item['total']
             result[key]['total'] += item['total']
         else:
-            result[key]['new'] = item['total']
+            result[key]['new'] += item['total']
             result[key]['total'] += item['total']
 
     data['navbar_active'] = 'expenses'
