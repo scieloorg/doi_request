@@ -6,16 +6,20 @@
     <thead>
       <tr>
         <th>${_(u'Período')}</th>
-        <th>${_(u'Custos')}</th>
+        <th>${_(u'Retrospectivos')}</th>
+        <th>${_(u'Novos')}</th>
+        <th>${_(u'Total')}</th>
       </tr>
     </thead>
     <tbody>
-      % for ndx, item in enumerate(expenses):
+      % for key, item in expenses.items():
         <tr>
-          <td>${item[0].strftime('%B %Y')}</td>
-          <td>$ ${format(item[1], '.2f')}</td>
+          <td>${key}</td>
+          <td>$ ${format(item['total'], '.2f')}</td>
+          <td>$ ${format(item['retro'], '.2f')}</td>
+          <td>$ ${format(item['new'], '.2f')}</td>
           <td>
-            <a href="${request.route_url('expenses_details')}?period=${item[0].strftime('%Y-%m')}">
+            <a href="${request.route_url('expenses_details')}?period=${key}">
               <button type="button" class="btn btn-primary btn-sm"><i class="fa fa-cloud-upload"></i> ${_(u'detalhes')}</button>
             </a>
           </td>

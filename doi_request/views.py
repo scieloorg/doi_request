@@ -123,12 +123,29 @@ def expenses(request):
     expenses = request.db.query(Expenses)
 
     expenses = request.db.query(
+        Expenses.retro,
         func.date_trunc('month', Expenses.registry_date).label('registry_month'),
         func.sum(Expenses.cost).label('total')
-    ).group_by('registry_month').order_by(desc('registry_month'))
+    ).group_by('registry_month').group_by(Expenses.retro).order_by(desc('registry_month'))
+
+    result = {}
+    for item in [i._asdict() for i in expenses]:
+        key = item['registry_month'].isoformat()[:7]
+        result.setdefault(key, {
+            "retro": 0,
+            "new": 0,
+            "total": 0
+        })
+
+        if item['retro'] is True:
+            result[key]['retro'] = item['total']
+            result[key]['total'] += item['total']
+        else:
+            result[key]['new'] = item['total']
+            result[key]['total'] += item['total']
 
     data['navbar_active'] = 'expenses'
-    data['expenses'] = expenses
+    data['expenses'] = result
 
     return data
 
