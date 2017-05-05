@@ -5,6 +5,7 @@ from datetime import datetime
 from datetime import timedelta
 
 from celery import Celery
+from celery import Task
 from celery.utils.log import get_task_logger
 from lxml import etree
 
@@ -135,7 +136,33 @@ def register_doi(self, code, xml):
     DBSession.commit()
     return (False, code)
 
-@app.task(bind=True, default_retry_delay=REQUEST_DOI_DELAY_RETRY, max_retries=200)
+
+class CallbackTask(Task):
+
+    def on_failure(self, exc, task_id, args, kwargs, einfo):
+        deposit, doi_batch_id = args
+        is_doi_register_submitted, code = deposit
+        deposit = DBSession.query(Deposit).filter_by(code=code).first()
+
+        log_title = 'Fail to registry DOI (%s) for (%s)' % (
+            deposit.doi, doi_batch_id
+        )
+        logger.error(log_title)
+        now = datetime.now()
+        deposit.feedback_status = 'error'
+        deposit.feedback_updated_at = now
+        deposit.updated_at = now
+        logevent = LogEvent()
+        logevent.title = log_title
+        logevent.type = 'feedback'
+        logevent.status = 'error'
+        logevent.deposit_code = deposit.code
+        DBSession.add(logevent)
+        DBSession.commit()
+
+        print('Fabio failure')
+
+@app.task(base=CallbackTask, bind=True, default_retry_delay=REQUEST_DOI_DELAY_RETRY, max_retries=200)
 def request_doi_status(self, deposit, doi_batch_id):
     is_doi_register_submitted, code = deposit
     deposit = DBSession.query(Deposit).filter_by(code=code).first()

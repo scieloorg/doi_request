@@ -48,7 +48,8 @@ def list_deposits(request):
             deposits = deposits.filter(Deposit.has_submission_xml_valid_references == request.session['filter_has_valid_references'])
 
     total = deposits.count()
-    deposits = deposits.order_by(desc('started_at')).limit(LIMIT).offset(request.session['offset'])
+    request.session['offset'] = request.session['offset'] if request.session['offset'] < total else 0
+    deposits = deposits.order_by(desc('started_at')).limit(LIMIT).offset(request.session['offset'] )
     data['deposits'] = deposits
     data['submission_status_to_template'] = template_choices.SUBMISSION_STATUS_TO_TEMPLATE
     data['feedback_status_to_template'] = template_choices.FEEDBACK_STATUS_TO_TEMPLATE
@@ -133,9 +134,16 @@ def expenses_details(request):
 
     expenses = request.db.query(Expenses)
 
+    total = expenses.count()
+    request.session['expenses_offset'] = request.session['expenses_offset'] if request.session['expenses_offset'] < total else 0
     data['navbar_active'] = 'expenses'
     data['expenses'] = expenses
-    data['offset'] = request.session['offset']
+    data['offset'] = request.session['expenses_offset']
+    data['limit'] = LIMIT if LIMIT <= total else total + 1
+    data['total'] = total
+    data['page'] = int((request.session['expenses_offset']/LIMIT)+1)
+    data['pagination_ruler'] = pagination_ruler(LIMIT, total, request.session['expenses_offset'])
+    data['total_pages'] = int((total/LIMIT)+1)
     data['period'] = period
 
     return data

@@ -52,7 +52,13 @@ def check_session(wrapped):
             'offset',
             request.session.get('offset', 0)
         )
+        expenses_offset = request.GET.get(
+            'expenses_offset',
+            request.session.get('expenses_offset', 0)
+        )
+
         request.session['offset'] = int(offset)
+        request.session['expenses_offset'] = int(expenses_offset)
         request.session['filter_issn'] = filter_issn
         request.session['filter_submission_status'] = filter_submission_status
         request.session['filter_feedback_status'] = filter_feedback_status

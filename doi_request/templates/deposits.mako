@@ -36,7 +36,7 @@
           <label>${_(u'Situação de submissão')}</label>
           <select name="filter_submission_status" class="form-control">
             <option value="" ${'selected' if filter_submission_status == '' else ''}>${_(u'todos')}</option>
-            % for item in submission_status_to_template:
+            % for item in sorted(submission_status_to_template):
               <option value="${item}" ${'selected' if filter_submission_status == item else ''}>${item}</option>
             % endfor
           </select>
@@ -45,7 +45,7 @@
           <label>${_(u'Situação de depósito')}</label>
           <select name="filter_feedback_status" class="form-control">
             <option value="" ${'selected' if filter_feedback_status == '' else ''}>${_(u'todos')}</option>
-            % for item in feedback_status_to_template:
+            % for item in sorted(feedback_status_to_template):
               <option value="${item}" ${'selected' if filter_feedback_status == item else ''}>${item}</option>
             % endfor
           </select>
@@ -85,7 +85,7 @@
     </div>
     <div class="box-body">
       <div class="row">
-      <%include file="deposits_paging.mako"/>
+        <%include file="paging.mako"/>
       </div>
       <table id="deposits" class="table table-bordered table-hover">
         <thead>
@@ -129,7 +129,7 @@
         </tbody>
       </table>
       <div class="row">
-      <%include file="deposits_paging.mako"/>
+        <%include file="paging.mako"/>
       </div>
     </div>
   </div>
