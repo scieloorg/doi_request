@@ -41,7 +41,7 @@ class Deposit(Base):
 class LogEvent(Base):
     __tablename__ = 'logevent'
     id = Column(Integer, primary_key=True)
-    date = Column('date', DateTime(timezone=True), nullable=False, default=datetime.utcnow, server_default=func.now())
+    date = Column('date', DateTime(timezone=True))
     title = Column('title', Text, nullable=False)
     body = Column('body', Text, default='')
     type = Column('type', String(16), nullable=False)
@@ -55,6 +55,6 @@ class Expenses(Base):
     id = Column(Integer, primary_key=True)
     retro = Column('retro', Boolean, index=True)
     publication_year = Column('publication_year', Integer, index=True)
-    registry_date = Column('registry_date', DateTime(timezone=True), default=datetime.utcnow, server_default=func.now())
+    registry_date = Column('registry_date', DateTime(timezone=True))
     doi = Column('doi', String(128), index=True)
     cost = Column('cost', Integer, nullable=False)
