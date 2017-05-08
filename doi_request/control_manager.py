@@ -48,16 +48,16 @@ def check_session(wrapped):
             'filter_has_valid_references',
             request.session.get('filter_has_valid_references', '')
         )
-        offset = request.GET.get(
-            'offset',
-            request.session.get('offset', 0)
+        deposits_offset = request.GET.get(
+            'deposits_offset',
+            request.session.get('deposits_offset', 0)
         )
         expenses_offset = request.GET.get(
             'expenses_offset',
             request.session.get('expenses_offset', 0)
         )
 
-        request.session['offset'] = int(offset)
+        request.session['deposits_offset'] = int(deposits_offset)
         request.session['expenses_offset'] = int(expenses_offset)
         request.session['filter_issn'] = filter_issn
         request.session['filter_submission_status'] = filter_submission_status

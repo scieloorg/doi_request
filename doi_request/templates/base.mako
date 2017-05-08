@@ -44,6 +44,11 @@
                     <i class="fa fa-dollar"></i> <span> ${_(u'Custos')}</span>
                   </a>
                 </li>
+                <li class="${'active' if navbar_active == 'downloads' else ''}">
+                  <a href="${request.route_url('downloads')}">
+                    <i class="fa fa-cloud-download"></i> <span> ${_(u'Downloads')}</span>
+                  </a>
+                </li>
               </ul>
               <form action="${request.route_url('list_deposits')}" method="get" class="navbar-form navbar-left" role="search">
                 <div class="input-group">

@@ -73,7 +73,8 @@ setup(
             'main = doi_request:main',
         ],
         'console_scripts': [
-            'processing_export_doi = processing.exportDOI:main'
+            'processing_export_doi = processing.exportDOI:main',
+            'processing_export_id = processing.export2id:main'
         ]
     },
 )

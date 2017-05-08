@@ -38,6 +38,8 @@ def list_deposits(request):
             Deposit.journal_acronym,
             Deposit.code,
             Deposit.prefix,
+            Deposit.pid,
+            Deposit.issue_label,
             Deposit.has_submission_xml_valid_references,
             Deposit.feedback_status,
             Deposit.submission_status
@@ -58,8 +60,8 @@ def list_deposits(request):
             deposits = deposits.filter(Deposit.has_submission_xml_valid_references == request.session['filter_has_valid_references'])
 
     total = deposits.count()
-    request.session['offset'] = request.session['offset'] if request.session['offset'] < total else 0
-    deposits = deposits.order_by(desc('started_at')).limit(LIMIT).offset(request.session['offset'] )
+    request.session['deposits_offset'] = request.session['deposits_offset'] if request.session['deposits_offset'] < total else 0
+    deposits = deposits.order_by(desc('started_at')).limit(LIMIT).offset(request.session['deposits_offset'] )
     data['deposits'] = deposits
     data['submission_status_to_template'] = template_choices.SUBMISSION_STATUS_TO_TEMPLATE
     data['feedback_status_to_template'] = template_choices.FEEDBACK_STATUS_TO_TEMPLATE
@@ -71,13 +73,14 @@ def list_deposits(request):
     data['filter_submission_status'] = request.session['filter_submission_status']
     data['filter_issn'] = request.session['filter_issn']
     data['filter_prefix'] = request.session['filter_prefix']
-    data['offset'] = request.session['offset']
+    data['offset'] = request.session['deposits_offset']
     data['limit'] = LIMIT if LIMIT <= total else total + 1
     data['total'] = total
-    data['page'] = int((request.session['offset']/LIMIT)+1)
-    data['pagination_ruler'] = pagination_ruler(LIMIT, total, request.session['offset'])
+    data['page'] = int((request.session['deposits_offset']/LIMIT)+1)
+    data['pagination_ruler'] = pagination_ruler(LIMIT, total, request.session['deposits_offset'])
     data['total_pages'] = int((total/LIMIT)+1)
     data['navbar_active'] = 'deposits'
+    data['offset_prefix'] = 'deposits'
 
     return data
 
@@ -179,6 +182,7 @@ def expenses_details(request):
     data['pagination_ruler'] = pagination_ruler(LIMIT, total, request.session['expenses_offset'])
     data['total_pages'] = int((total/LIMIT)+1)
     data['period'] = period
+    data['offset_prefix'] = 'expenses'
 
     return data
 
@@ -201,6 +205,15 @@ def deposit_post(request):
 @check_session
 @base_data_manager
 def help(request):
+
+    data = request.data_manager
+
+    return data
+
+@view_config(route_name='downloads', renderer='templates/downloads.mako')
+@check_session
+@base_data_manager
+def downloads(request):
 
     data = request.data_manager
 

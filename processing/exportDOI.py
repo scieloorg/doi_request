@@ -12,9 +12,7 @@ from datetime import datetime, timedelta
 
 from articlemeta.client import ThriftClient
 from pyramid.config import Configurator
-from sqlalchemy import create_engine
 
-from doi_request.models import initialize_sql
 from doi_request.controller import Depositor
 from processing import utils
 
@@ -68,10 +66,6 @@ if SENTRY_HANDLER:
         'dsn': SENTRY_HANDLER,
     }
     LOGGING['loggers']['']['handlers'].append('sentry')
-
-# Database Config
-engine = create_engine(os.environ.get('SQL_ENGINE', 'sqlite:///:memory:'))
-initialize_sql(engine)
 
 
 class ExportDOI(object):
