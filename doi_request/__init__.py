@@ -37,6 +37,7 @@ def main(global_config, **settings):
 
     # Database Config
     engine = create_engine(os.environ.get('SQL_ENGINE', 'sqlite:///:memory:'))
+    static_assets = os.environ.get('STATIC_MEDIA', 'media')
     config.registry.dbmaker = sessionmaker(bind=engine)
     config.scan('doi_request.models')  # the "important" line
     initialize_sql(engine)
@@ -45,6 +46,7 @@ def main(global_config, **settings):
 
     config.include('pyramid_mako')
     config.add_static_view('static', 'static', cache_max_age=3600)
+    config.add_static_view('media', 'media', cache_max_age=3600)
     config.add_route('list_deposits', '/')
     config.add_route('help', '/help')
     config.add_route('deposit_request', '/deposit/request')
