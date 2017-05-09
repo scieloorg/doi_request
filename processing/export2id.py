@@ -57,7 +57,7 @@ LOGGING = {
             'level': LOGGING_LEVEL,
             'propagate': False,
         },
-        'processing.exportDOI': {
+        'processing.export2id': {
             'level': LOGGING_LEVEL,
             'propagate': True,
         },
@@ -93,6 +93,7 @@ class Export2Id(object):
             xml_doc = etree.parse(xml)
             logger.debug('XML is well formed')
         except Exception as e:
+            import pdb; pdb.set_trace()
             logger.exception(e)
             logger.error('Fail to parse XML')
             return []
@@ -112,8 +113,9 @@ class Export2Id(object):
 
     def run(self):
         logger.info("Processing started")
-        deposits = DBSession.query(Deposit).limit(100)
+        deposits = DBSession.query(Deposit)
         ndx = 0
+
         for deposit in deposits:
             logger.debug("Reading registry (%s)", deposit.code)
             if not deposit.doi:
@@ -124,6 +126,10 @@ class Export2Id(object):
             self.write('!v001!%s' % deposit.doi)
             self.write('!v237!%s' % deposit.doi)
             self.write('!v003!%s' % 'art')
+
+            if not deposit.feedback_xml:
+                logger.debug('Crossref reponse XML not available, skiping references DOI checking')
+                continue
 
             for reference in self.extract_ref_dois(deposit.feedback_xml):
                 if not reference:
