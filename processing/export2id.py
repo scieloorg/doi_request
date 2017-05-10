@@ -93,7 +93,6 @@ class Export2Id(object):
             xml_doc = etree.parse(xml)
             logger.debug('XML is well formed')
         except Exception as e:
-            import pdb; pdb.set_trace()
             logger.exception(e)
             logger.error('Fail to parse XML')
             return []
@@ -113,7 +112,11 @@ class Export2Id(object):
 
     def run(self):
         logger.info("Processing started")
-        deposits = DBSession.query(Deposit)
+
+        deposits = DBSession.query(
+            Deposit.doi, Deposit.pid, Deposit.feedback_xml, Deposit.code
+        )
+
         ndx = 0
 
         for deposit in deposits:
