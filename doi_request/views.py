@@ -194,10 +194,7 @@ def deposit_post(request):
 
     pids = request.GET.get('pids', '')
 
-    for ndx, pid in enumerate(pids.split('\r')):
-        if ndx > 9:
-            break
-        depositor.deposit_by_pid(pid.strip(), data['collection_acronym'])
+    depositor.deposit_by_pids(['_'.join(['scl', i.strip()]) for i in pids.split('\r')[:9]])
 
     return HTTPFound('/')
 

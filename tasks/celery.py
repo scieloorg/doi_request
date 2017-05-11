@@ -1,18 +1,21 @@
 import os
 import time
 from io import BytesIO
+import pickle
 from datetime import datetime
 from datetime import timedelta
 
 from celery import Celery
-from celery import Task
+from celery import Task, chain
 from celery.utils.log import get_task_logger
 from lxml import etree
+from articlemeta.client import ThriftClient
 
 from crossref.client import CrossrefClient
 from doi_request.models.depositor import Deposit, LogEvent, Expenses
 from doi_request.models import configure_session_engine, DBSession
-from doi_request.controller import Depositor
+
+from celery.contrib import rdb
 
 logger = get_task_logger(__name__)
 
@@ -21,12 +24,6 @@ app = Celery('tasks', broker='amqp://guest@rabbitmq//')
 
 # Database Config
 configure_session_engine()
-
-crossref_client = CrossrefClient(
-    os.environ.get('CROSSREF_PREFIX', ''),
-    os.environ.get('CROSSREF_API_USER', ''),
-    os.environ.get('CROSSREF_API_PASSWORD', '')
-)
 
 
 class CrossrefExceptions(Exception):
@@ -45,8 +42,11 @@ class UnkownSubmission(CrossrefExceptions):
     pass
 
 
-REGISTER_DOI_DELAY_RETRY = 60
-REQUEST_DOI_DELAY_RETRY = 60
+class ChainAborted(Exception):
+    pass
+
+REGISTER_DOI_DELAY_RETRY = 600
+REQUEST_DOI_DELAY_RETRY = 600
 REGISTER_DOI_DELAY_RETRY_TD = timedelta(seconds=REGISTER_DOI_DELAY_RETRY)
 REQUEST_DOI_DELAY_RETRY_TD = timedelta(seconds=REQUEST_DOI_DELAY_RETRY)
 CROSSREF_XSD = open(os.path.dirname(__file__)+'/../xsd/crossref4.4.0.xsd')
@@ -55,9 +55,14 @@ CROSSREF_API_USER = os.environ.get('CROSSREF_API_USER', None)
 CROSSREF_API_PASSWORD = os.environ.get('CROSSREF_API_PASSWORD', None)
 CROSSREF_DEPOSITOR_NAME = os.environ.get('CROSSREF_DEPOSITOR_NAME', None)
 CROSSREF_DEPOSITOR_EMAIL = os.environ.get('CROSSREF_DEPOSITOR_EMAIL', None)
+ARTICLEMETA_THRIFTSERVER = os.environ.get(
+    'ARTICLEMETA_THRIFTSERVER', 'articlemeta.scielo.org:11621')
+
+crossref_client = CrossrefClient(
+    CROSSREF_PREFIX, CROSSREF_API_USER, CROSSREF_API_PASSWORD)
 
 
-def _parse_schema(self):
+def _parse_schema():
 
     try:
         sch_doc = etree.parse(CROSSREF_XSD)
@@ -67,61 +72,15 @@ def _parse_schema(self):
         logger.error('Fail to parse XML')
         return False
 
-    self.crossref_schema = sch
+    return sch
 
 
 PARSED_SCHEMA = _parse_schema()
 
+@app.task(bind=True, max_retries=1)
+def triage_deposit(self, code):
 
-@app.tasks(bind=True)
-def registry_dispatcher(self, documents):
-    """
-    This task receive a list of codes that should be queued for DOI registry
-    """
-
-    for document, xml in documents:
-        code = '_'.join([document.collection_acronym, document.publisher_id])
-        log_title = 'Reading document: %s' % code
-        logger.info(log_title)
-        xml_file_name = '%s.xml' % code
-        doi_prefix = document.doi.split('/')[0] if document.doi else ''
-        now = datetime.now()
-        depitem = Deposit(
-            code=code,
-            pid=document.publisher_id,
-            issn=document.journal.scielo_issn,
-            volume=document.issue.volume,
-            number=document.issue.number,
-            issue_label=document.issue.label,
-            journal=document.journal.title,
-            journal_acronym=document.journal.acronym,
-            collection_acronym=document.collection_acronym,
-            xml_file_name=xml_file_name,
-            doi=document.doi,
-            publication_year=int(document.publication_date[0:4]),
-            prefix=doi_prefix,
-            has_submission_xml_valid_references=False,
-            submission_updated_at=now,
-            submission_status='waiting',
-            updated_at=now,
-            started_at=now
-        )
-
-        deposit = DBSession.query(Deposit).filter_by(code=code).first()
-
-        if deposit:
-            DBSession.delete(deposit)
-            DBSession.commit()
-
-        deposit = DBSession.add(depitem)
-        DBSession.commit()
-
-        chain = triage_deposit.s(deposit) | load_xml_from_articlemeta.s(deposit), prepare_document.s(deposit) | register_doi.s(deposit, xml) | request_doi_status.s(deposit)
-        chain()
-
-
-@app.task(bind=True)
-def triage_deposit(self, deposit):
+    deposit = DBSession.query(Deposit).filter_by(code=code).first()
 
     if not deposit.doi:
         now = datetime.now()
@@ -136,9 +95,9 @@ def triage_deposit(self, deposit):
         logevent.deposit_code = deposit.code
         DBSession.add(logevent)
         DBSession.commit()
-        return
+        raise ChainAborted(log_title)
 
-    if deposit.lower() != CROSSREF_PREFIX.lower():
+    if deposit.prefix.lower() != CROSSREF_PREFIX.lower():
         now = datetime.now()
         log_title = 'Document DOI prefix (%s) do no match with the collection prefix (%s)' % (doi_prefix, self.prefix)
         deposit.submission_status = 'notapplicable'
@@ -153,31 +112,36 @@ def triage_deposit(self, deposit):
         logevent.deposit_code = deposit.code
         DBSession.add(logevent)
         DBSession.commit()
-        return
+        raise ChainAborted(log_title)
 
-    return deposit
+    return code
 
 @app.task(bind=True, default_retry_delay=60, max_retries=100)
-def load_xml_from_articlemeta(self, deposit):
+def load_xml_from_articlemeta(self, code):
+
+    deposit = DBSession.query(Deposit).filter_by(code=code).first()
+    articlemeta = ThriftClient(domain=ARTICLEMETA_THRIFTSERVER)
 
     try:
         log_title = 'Loading XML document from ArticleMeta (%s)' % code
-        deposit = LogEvent()
-        deposit.title = log_title
-        deposit.type = 'submission'
-        deposit.status = 'info'
-        deposit.deposit_code = deposit.code
-        DBSession.add(deposit)
+        logevent = LogEvent()
+        logevent.title = log_title
+        logevent.type = 'submission'
+        logevent.status = 'info'
+        logevent.deposit_code = deposit.code
+        DBSession.add(logevent)
         DBSession.commit()
-        xml = self._articlemeta.document(document.publisher_id, document.collection_acronym, fmt='xmlcrossref')
+        xml = articlemeta.document(
+            deposit.pid, deposit.collection_acronym, fmt='xmlcrossref'
+        )
     except Exception as exc:
         logger.exception(exc)
         now = datetime.now()
         log_title = 'Fail to load XML document from ArticleMeta (%s)' % code
         logger.error(log_title)
         deposit.submission_status = 'error'
-        deposit.submission_updated_at = now
-        deposit.updated_at = now
+        deposit.submission_updated_at = datetime.now()
+        deposit.updated_at = datetime.now()
         logevent = LogEvent()
         logevent.title = log_title
         logevent.body = exc
@@ -188,23 +152,25 @@ def load_xml_from_articlemeta(self, deposit):
         DBSession.commit()
         raise self.retry(exc=ComunicationError(log_title))
 
-    log_title = 'XML loaded document from ArticleMeta (%s)' % code
-    deposit = LogEvent()
-    deposit.title = log_title
-    deposit.type = 'submission'
-    deposit.status = 'info'
-    deposit.submission_xml = etree.tostring(parsed_xml, encoding='utf-8', pretty_print=True).decode('utf-8')
-    deposit.deposit_code = deposit.code
-    DBSession.add(deposit)
+    log_title = 'XML Document loaded from ArticleMeta (%s)' % code
+    deposit.submission_status = 'waiting'
+    deposit.submission_xml = xml
+    deposit.submission_updated_at = datetime.now()
+    deposit.updated_at = datetime.now()
+    logevent = LogEvent()
+    logevent.title = log_title
+    logevent.type = 'submission'
+    logevent.status = 'success'
+    logevent.deposit_code = deposit.code
+    DBSession.add(logevent)
     DBSession.commit()
 
-    return deposit
+    return code
 
-@app.task(bind=True, default_retry_delay=REGISTER_DOI_DELAY_RETRY, max_retries=100)
-def prepare_document(self, deposit):
+@app.task(bind=True, default_retry_delay=REGISTER_DOI_DELAY_RETRY, max_retries=2000)
+def prepare_document(self, code):
 
     def setup_depositor(xml):
-
         registrant = xml.find('//{http://www.crossref.org/schema/4.4.0}registrant')
         registrant.text = CROSSREF_DEPOSITOR_NAME
         depositor_name = xml.find('//{http://www.crossref.org/schema/4.4.0}depositor_name')
@@ -227,7 +193,8 @@ def prepare_document(self, deposit):
         xml_doc = setup_depositor(xml_doc)
 
         if only_front:
-            citation_list = xml_doc.find('//{http://www.crossref.org/schema/4.4.0}citation_list')
+            citation_list = xml_doc.find(
+                '//{http://www.crossref.org/schema/4.4.0}citation_list')
             if citation_list:
                 citation_list.getparent().remove(citation_list)
 
@@ -240,7 +207,9 @@ def prepare_document(self, deposit):
             logger.error('Fail to parse XML')
             return (False, xml_doc, str(e))
 
-    is_valid, parsed_xml, exc = xml_is_valid(deposit.xml)
+    deposit = DBSession.query(Deposit).filter_by(code=code).first()
+    is_valid, parsed_xml, exc = xml_is_valid(deposit.submission_xml)
+    deposit.submission_xml = etree.tostring(parsed_xml, encoding='utf-8', pretty_print=True).decode('utf-8')
 
     if is_valid is True:
         log_title = 'XML is valid, it will be submitted to Crossref'
@@ -250,7 +219,8 @@ def prepare_document(self, deposit):
         deposit.has_submission_xml_valid_references = True
         deposit.submission_status = 'waiting'
         deposit.submission_updated_at = now
-        deposit.doi_batch_id = parsed_xml.find('//{http://www.crossref.org/schema/4.4.0}doi_batch_id').text
+        deposit.doi_batch_id = parsed_xml.find(
+            '//{http://www.crossref.org/schema/4.4.0}doi_batch_id').text
         logevent = LogEvent()
         logevent.title = log_title
         logevent.type = 'submission'
@@ -258,8 +228,7 @@ def prepare_document(self, deposit):
         logevent.deposit_code = deposit.code
         DBSession.add(logevent)
         DBSession.commit()
-
-        return deposit, parsed_xml
+        return code
 
     log_title = 'XML with references is invalid, fail to parse xml for document (%s)' % code
     now = datetime.now()
@@ -288,7 +257,10 @@ def prepare_document(self, deposit):
     DBSession.add(logevent)
     DBSession.commit()
 
-    is_valid, parsed_xml, exc = self.xml_is_valid(deposit.xml, only_front=True)
+    is_valid, parsed_xml, exc = xml_is_valid(
+        deposit.submission_xml, only_front=True
+    )
+    deposit.submission_xml = etree.tostring(parsed_xml, encoding='utf-8', pretty_print=True).decode('utf-8')
 
     if is_valid is True:
         log_title = 'XML only with front metadata is valid, it will be submitted to Crossref'
@@ -297,7 +269,8 @@ def prepare_document(self, deposit):
         deposit.is_xml_valid = True
         deposit.submission_status = 'waiting'
         deposit.submission_updated_at = now
-        deposit.doi_batch_id = parsed_xml.find('//{http://www.crossref.org/schema/4.4.0}doi_batch_id').text
+        deposit.doi_batch_id = parsed_xml.find(
+            '//{http://www.crossref.org/schema/4.4.0}doi_batch_id').text
         logevent = LogEvent()
         logevent.title = log_title
         logevent.type = 'submission'
@@ -306,7 +279,7 @@ def prepare_document(self, deposit):
         DBSession.add(logevent)
         DBSession.commit()
 
-        return deposit, parsed_xml
+        return code
 
     log_title = 'XML only with front metadata is also invalid, fail to parse xml for document (%s)' % code
     now = datetime.now()
@@ -323,10 +296,13 @@ def prepare_document(self, deposit):
     logevent.deposit_code = depitem.code
     DBSession.add(logevent)
     DBSession.commit()
-    return
+    raise ChainAborted(log_title)
 
-@app.task(bind=True, default_retry_delay=REGISTER_DOI_DELAY_RETRY, max_retries=100)
-def register_doi(self, deposit):
+
+@app.task(bind=True, default_retry_delay=REGISTER_DOI_DELAY_RETRY, max_retries=2000)
+def register_doi(self, code):
+
+    deposit = DBSession.query(Deposit).filter_by(code=code).first()
 
     try:
         log_title = 'Sending XML to Crossref'
@@ -337,7 +313,7 @@ def register_doi(self, deposit):
         logevent.deposit_code = deposit.code
         DBSession.add(logevent)
         DBSession.commit()
-        result = crossref_client.register_doi(code, xml)
+        result = crossref_client.register_doi(code, deposit.submission_xml)
     except Exception as exc:
         log_title = 'Fail to Connect to Crossref API, retrying at (%s) to submit (%s)' % (
             datetime.now()+REGISTER_DOI_DELAY_RETRY_TD, code
@@ -392,7 +368,7 @@ def register_doi(self, deposit):
         logevent.deposit_code = deposit.code
         DBSession.add(logevent)
         DBSession.commit()
-        return (True, deposit)
+        return code
 
     log_title = 'Fail registering DOI for (%s)' % code
     now = datetime.now()
@@ -407,18 +383,18 @@ def register_doi(self, deposit):
     logevent.deposit_code = deposit.code
     DBSession.add(logevent)
     DBSession.commit()
-    return (False, deposit)
+    raise ChainAborted(log_title)
 
 
 class CallbackTask(Task):
 
     def on_failure(self, exc, task_id, args, kwargs, einfo):
-        deposit, doi_batch_id = args
-        is_doi_register_submitted, code = deposit
+        code = args[0]
+
         deposit = DBSession.query(Deposit).filter_by(code=code).first()
 
         log_title = 'Fail to registry DOI (%s) for (%s)' % (
-            deposit.doi, doi_batch_id
+            deposit.doi, deposit.doi_batch_id
         )
         logger.error(log_title)
         now = datetime.now()
@@ -434,14 +410,12 @@ class CallbackTask(Task):
         DBSession.commit()
 
 
-@app.task(base=CallbackTask, bind=True, default_retry_delay=REQUEST_DOI_DELAY_RETRY, max_retries=200)
-def request_doi_status(self, deposit):
-    is_doi_register_submitted, deposit = deposit
+@app.task(base=CallbackTask, bind=True, default_retry_delay=REQUEST_DOI_DELAY_RETRY, max_retries=1)
+def request_doi_status(self, code):
 
-    if is_doi_register_submitted is False:
-        return False
+    deposit = DBSession.query(Deposit).filter_by(code=code).first()
 
-    log_title = 'Checking DOI registering Status for (%s)' % doi_batch_id
+    log_title = 'Checking DOI registering Status for (%s)' % deposit.doi_batch_id
     now = datetime.now()
     deposit.feedback_status = 'waiting'
     deposit.feedback_updated_at = now
@@ -455,10 +429,10 @@ def request_doi_status(self, deposit):
     DBSession.commit()
 
     try:
-        result = crossref_client.request_doi_status_by_batch_id(doi_batch_id)
+        result = crossref_client.request_doi_status_by_batch_id(deposit.doi_batch_id)
     except Exception as exc:
         log_title = 'Fail to Connect to Crossref API, retrying to check submission status at (%s) for (%s)' % (
-            datetime.now()+REQUEST_DOI_DELAY_RETRY_TD, doi_batch_id
+            datetime.now()+REQUEST_DOI_DELAY_RETRY_TD, deposit.doi_batch_id
         )
         logger.error(log_title)
         now = datetime.now()
@@ -478,7 +452,7 @@ def request_doi_status(self, deposit):
     if result.status_code != 200:
         now = datetime.now()
         log_title = 'Fail to Connect to Crossref API, retrying to check submission status at (%s) (%s)' % (
-            now+REQUEST_DOI_DELAY_RETRY_TD, doi_batch_id
+            now+REQUEST_DOI_DELAY_RETRY_TD, deposit.doi_batch_id
         )
         deposit.feedback_status = 'waiting'
         deposit.feedback_updated_at = now
@@ -497,7 +471,7 @@ def request_doi_status(self, deposit):
     xml_doc = etree.parse(xml)
     doi_batch_status = xml_doc.find('.').get('status')
     if doi_batch_status != 'completed':
-        log_title = 'Crossref has received the request, waiting Crossref to process it (%s)' % doi_batch_id
+        log_title = 'Crossref has received the request, waiting Crossref to process it (%s)' % deposit.doi_batch_id
         logger.error(log_title)
         now = datetime.now()
         deposit.feedback_status = 'waiting'
@@ -514,7 +488,7 @@ def request_doi_status(self, deposit):
 
     feedback_status = xml_doc.find('.//record_diagnostic').get('status').lower() or 'unkown'
     feedback_body = xml_doc.find('.//record_diagnostic/msg').text or ''
-    log_title = 'Crossref final status for (%s) is (%s)' % (doi_batch_id, feedback_status)
+    log_title = 'Crossref final status for (%s) is (%s)' % (deposit.doi_batch_id, feedback_status)
     logger.info(log_title)
     now = datetime.now()
     deposit.feedback_status = feedback_status
@@ -541,3 +515,63 @@ def request_doi_status(self, deposit):
         expenses.retro = True if int(deposit.publication_year) < back_file_limit else False
         DBSession.add(expenses)
         DBSession.commit()
+
+@app.task(bind=True, max_retries=1)
+def registry_dispatcher_document(self, code, collection):
+    """
+    This task receive a list of codes that should be queued for DOI registry
+    """
+    articlemeta = ThriftClient(domain=ARTICLEMETA_THRIFTSERVER)
+    document = articlemeta.document(code, collection)
+    code = '_'.join([document.collection_acronym, document.publisher_id])
+    log_title = 'Reading document: %s' % code
+    logger.info(log_title)
+    xml_file_name = '%s.xml' % code
+    doi_prefix = document.doi.split('/')[0] if document.doi else ''
+    now = datetime.now()
+    depitem = Deposit(
+        code=code,
+        pid=document.publisher_id,
+        issn=document.journal.scielo_issn,
+        volume=document.issue.volume,
+        number=document.issue.number,
+        issue_label=document.issue.label,
+        journal=document.journal.title,
+        journal_acronym=document.journal.acronym,
+        collection_acronym=document.collection_acronym,
+        xml_file_name=xml_file_name,
+        doi=document.doi,
+        publication_year=int(document.publication_date[0:4]),
+        prefix=doi_prefix,
+        has_submission_xml_valid_references=False,
+        submission_updated_at=now,
+        submission_status='waiting',
+        updated_at=now,
+        started_at=now
+    )
+
+    deposit = DBSession.query(Deposit).filter_by(code=code).first()
+
+    if deposit:
+        DBSession.delete(deposit)
+        DBSession.commit()
+
+    deposit = DBSession.add(depitem)
+    DBSession.commit()
+
+    chain(
+        triage_deposit.s(code),
+        load_xml_from_articlemeta.s(),
+        prepare_document.s(),
+        register_doi.s(),
+        request_doi_status.s()
+    ).apply_async()
+
+
+@app.task(bind=True)
+def registry_dispatcher(self, pids_list):
+
+    for item in pids_list:
+        collection, code = item.split('_')
+
+        registry_dispatcher_document.delay(code, collection)
