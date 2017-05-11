@@ -410,7 +410,7 @@ class CallbackTask(Task):
         DBSession.commit()
 
 
-@app.task(base=CallbackTask, bind=True, default_retry_delay=REQUEST_DOI_DELAY_RETRY, max_retries=1)
+@app.task(base=CallbackTask, bind=True, default_retry_delay=REQUEST_DOI_DELAY_RETRY, max_retries=2000)
 def request_doi_status(self, code):
 
     deposit = DBSession.query(Deposit).filter_by(code=code).first()
