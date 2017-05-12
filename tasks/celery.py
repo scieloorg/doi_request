@@ -99,7 +99,7 @@ def triage_deposit(self, code):
 
     if deposit.prefix.lower() != CROSSREF_PREFIX.lower():
         now = datetime.now()
-        log_title = 'Document DOI prefix (%s) do no match with the collection prefix (%s)' % (doi_prefix, self.prefix)
+        log_title = 'Document DOI prefix (%s) do no match with the collection prefix (%s)' % (deposit.prefix, CROSSREF_PREFIX)
         deposit.submission_status = 'notapplicable'
         deposit.feedback_status = 'notapplicable'
         deposit.submission_updated_at = now

@@ -194,7 +194,7 @@ def deposit_post(request):
 
     pids = request.GET.get('pids', '')
 
-    depositor.deposit_by_pids(['_'.join(['scl', i.strip()]) for i in pids.split('\r')[:9]])
+    depositor.deposit_by_pids(['_'.join(['scl', i.strip()]) for i in pids.split('\r')])
 
     return HTTPFound('/')
 

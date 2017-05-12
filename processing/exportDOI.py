@@ -71,11 +71,10 @@ if SENTRY_HANDLER:
 class ExportDOI(object):
 
     def __init__(self, collection, issns=None, output_file=None, from_date=FROM,
-                 until_date=UNTIL, prefix=None, api_user=None, api_key=None,
-                 depositor_name=None, depositor_email=None, test_mode=False):
+                 until_date=UNTIL, test_mode=False):
 
         self._articlemeta = ThriftClient(domain=os.environ.get('ARTICLEMETA_THRIFTSERVER', 'articlemeta.scielo.org:11621'))
-        self._depositor = Depositor(prefix=prefix, api_user=api_user, api_key=api_key, depositor_name=depositor_name, depositor_email=depositor_email, test_mode=test_mode)
+        self._depositor = Depositor()
         self.collection = collection
         self.from_date = from_date
         self.until_date = until_date
@@ -84,15 +83,22 @@ class ExportDOI(object):
     def run(self):
         logger.info('Processing Started')
         logger.info('Date range (%s) to (%s)',  self.from_date, self.until_date)
-
+        logger.info('Processing will setup a list of documents to have their DOI registry scheduled')
         count = 0
+        docs = []
         for issn in self.issns:
+
             for document in self._articlemeta.documents(
                     collection=self.collection, issn=issn,
-                    from_date=self.from_date, until_date=self.until_date):
+                    from_date=self.from_date, until_date=self.until_date,
+                    only_identifiers=True):
 
-                self._depositor.deposit(document)
+                code = '_'.join([document.collection, document.code])
+                logger.debug('Including document to schedule list (%s)', code)
+                docs.append(code)
 
+        self._depositor.deposit_by_pids(docs)
+        logger.info('Schedule finished %d documents sent to processing cue', % len(docs))
         logger.info('Processing Finished')
 
 
@@ -113,41 +119,6 @@ def main():
         '-i',
         default=None,
         help='Full path to a txt file within a list of ISSNs to be exported'
-    )
-
-    parser.add_argument(
-        '--api_user',
-        '-u',
-        default=os.environ.get('CROSSREF_API_USER', None),
-        help='Crossref Publisher account name'
-    )
-
-    parser.add_argument(
-        '--api_key',
-        '-p',
-        default=os.environ.get('CROSSREF_API_PASSWORD', None),
-        help='Crossref Publisher account password'
-    )
-
-    parser.add_argument(
-        '--prefix',
-        '-x',
-        default=os.environ.get('CROSSREF_PREFIX', None),
-        help='Crossref Prefix'
-    )
-
-    parser.add_argument(
-        '--depositor_name',
-        '-d',
-        default=os.environ.get('CROSSREF_DEPOSITOR_NAME', None),
-        help='Name of the depositor. It will be attached to the XML metadata'
-    )
-
-    parser.add_argument(
-        '--depositor_email',
-        '-e',
-        default=os.environ.get('CROSSREF_DEPOSITOR_EMAIL', None),
-        help='Email of the depositor. It will be attached to the XML metadata'
     )
 
     parser.add_argument(
@@ -220,9 +191,11 @@ def main():
         args.until_date = datetime.now().isoformat()[:10]
 
     export = ExportDOI(
-        args.collection, issns, from_date=args.from_date, until_date=args.until_date,
-        prefix=args.prefix, api_user=args.api_user, api_key=args.api_key,
-        depositor_name=args.depositor_name, depositor_email=args.depositor_email,
-        test_mode=args.test_mode)
+        args.collection,
+        issns,
+        from_date=args.from_date,
+        until_date=args.until_date,
+        test_mode=args.test_mode
+    )
 
     export.run()
