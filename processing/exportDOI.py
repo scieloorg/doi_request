@@ -98,7 +98,7 @@ class ExportDOI(object):
                 docs.append(code)
 
         self._depositor.deposit_by_pids(docs)
-        logger.info('Schedule finished %d documents sent to processing cue', % len(docs))
+        logger.info('Schedule finished %d documents sent to processing cue', len(docs))
         logger.info('Processing Finished')
 
 
