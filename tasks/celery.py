@@ -299,7 +299,7 @@ def prepare_document(self, code):
     raise ChainAborted(log_title)
 
 
-@app.task(bind=True, default_retry_delay=REGISTER_DOI_DELAY_RETRY, max_retries=2000)
+@app.task(bind=True, default_retry_delay=REGISTER_DOI_DELAY_RETRY, max_retries=20000)
 def register_doi(self, code):
 
     deposit = DBSession.query(Deposit).filter_by(code=code).first()
@@ -410,7 +410,7 @@ class CallbackTask(Task):
         DBSession.commit()
 
 
-@app.task(base=CallbackTask, bind=True, default_retry_delay=REQUEST_DOI_DELAY_RETRY, max_retries=2000)
+@app.task(base=CallbackTask, bind=True, default_retry_delay=REQUEST_DOI_DELAY_RETRY, max_retries=20000)
 def request_doi_status(self, code):
 
     deposit = DBSession.query(Deposit).filter_by(code=code).first()
@@ -568,7 +568,7 @@ def registry_dispatcher_document(self, code, collection):
     ).apply_async()
 
 
-@app.task(bind=True)
+@app.task(bind=True, max_retries=1)
 def registry_dispatcher(self, pids_list):
 
     for item in pids_list:
