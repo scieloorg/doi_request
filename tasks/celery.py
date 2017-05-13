@@ -284,16 +284,16 @@ def prepare_document(self, code):
     log_title = 'XML only with front metadata is also invalid, fail to parse xml for document (%s)' % code
     now = datetime.now()
     logger.error(log_title)
-    depitem.is_xml_valid = False
-    depitem.submission_status = 'error'
-    depitem.submission_updated_at = now
-    depitem.updated_at = now
+    deposit.is_xml_valid = False
+    deposit.submission_status = 'error'
+    deposit.submission_updated_at = now
+    deposit.updated_at = now
     logevent = LogEvent()
     logevent.title = log_title
     logevent.body = exc
     logevent.type = 'submission'
     logevent.status = 'error'
-    logevent.deposit_code = depitem.code
+    logevent.deposit_code = deposit.code
     DBSession.add(logevent)
     DBSession.commit()
     raise ChainAborted(log_title)
