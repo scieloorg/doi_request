@@ -45,8 +45,8 @@ class UnkownSubmission(CrossrefExceptions):
 class ChainAborted(Exception):
     pass
 
-REGISTER_DOI_DELAY_RETRY = 60
-REQUEST_DOI_DELAY_RETRY = 60
+REGISTER_DOI_DELAY_RETRY = 600
+REQUEST_DOI_DELAY_RETRY = 600
 REGISTER_DOI_DELAY_RETRY_TD = timedelta(seconds=REGISTER_DOI_DELAY_RETRY)
 REQUEST_DOI_DELAY_RETRY_TD = timedelta(seconds=REQUEST_DOI_DELAY_RETRY)
 SUGGEST_DOI_IDENTIFICATION = bool(os.environ.get('SUGGEST_DOI_IDENTIFICATION', False))
@@ -93,7 +93,7 @@ def triage_deposit(self, code):
         logevent.title = log_title
         logevent.type = 'submission'
         logevent.status = 'error'
-        logevent.deposit_code = deposit.code
+        logevent.deposit_code = code
         DBSession.add(logevent)
         DBSession.commit()
         raise ChainAborted(log_title)
@@ -110,7 +110,7 @@ def triage_deposit(self, code):
         logevent.title = log_title
         logevent.type = 'general'
         logevent.status = 'notapplicable'
-        logevent.deposit_code = deposit.code
+        logevent.deposit_code = code
         DBSession.add(logevent)
         DBSession.commit()
         raise ChainAborted(log_title)
@@ -131,7 +131,7 @@ def load_xml_from_articlemeta(self, code):
         logevent.title = log_title
         logevent.type = 'submission'
         logevent.status = 'info'
-        logevent.deposit_code = deposit.code
+        logevent.deposit_code = code
         DBSession.add(logevent)
         DBSession.commit()
         xml = articlemeta.document(
@@ -150,7 +150,7 @@ def load_xml_from_articlemeta(self, code):
         logevent.body = str(exc)
         logevent.type = 'submission'
         logevent.status = 'error'
-        logevent.deposit_code = deposit.code
+        logevent.deposit_code = code
         DBSession.add(logevent)
         DBSession.commit()
         raise self.retry(exc=ComunicationError(log_title))
@@ -164,7 +164,7 @@ def load_xml_from_articlemeta(self, code):
     logevent.title = log_title
     logevent.type = 'submission'
     logevent.status = 'success'
-    logevent.deposit_code = deposit.code
+    logevent.deposit_code = code
     DBSession.add(logevent)
     DBSession.commit()
 
@@ -172,6 +172,8 @@ def load_xml_from_articlemeta(self, code):
 
 @app.task(bind=True, default_retry_delay=REGISTER_DOI_DELAY_RETRY, max_retries=2000)
 def prepare_document(self, code):
+
+    deposit = DBSession.query(Deposit).filter_by(code=code).first()
 
     def setup_depositor(xml):
         registrant = xml.find('//{http://www.crossref.org/schema/4.4.0}registrant')
@@ -181,6 +183,7 @@ def prepare_document(self, code):
         depositor_email = xml.find('//{http://www.crossref.org/schema/4.4.0}email_address')
         depositor_email.text = CROSSREF_DEPOSITOR_EMAIL
         doi = xml.find('//{http://www.crossref.org/schema/4.4.0}doi_data/{http://www.crossref.org/schema/4.4.0}doi')
+        rdb.set_trace()
         doi.text = deposit.doi
 
         return xml
@@ -215,7 +218,6 @@ def prepare_document(self, code):
             logger.error('Fail to parse XML')
             return (False, xml_doc, str(e))
 
-    deposit = DBSession.query(Deposit).filter_by(code=code).first()
     is_valid, parsed_xml, exc = xml_is_valid(deposit.submission_xml)
     deposit.submission_xml = etree.tostring(parsed_xml, encoding='utf-8', pretty_print=True).decode('utf-8')
 
@@ -233,7 +235,7 @@ def prepare_document(self, code):
         logevent.title = log_title
         logevent.type = 'submission'
         logevent.status = 'success'
-        logevent.deposit_code = deposit.code
+        logevent.deposit_code = code
         DBSession.add(logevent)
         DBSession.commit()
         return code
@@ -250,7 +252,7 @@ def prepare_document(self, code):
     logevent.body = exc
     logevent.type = 'submission'
     logevent.status = 'error'
-    logevent.deposit_code = deposit.code
+    logevent.deposit_code = code
     DBSession.add(logevent)
     DBSession.commit()
 
@@ -261,7 +263,7 @@ def prepare_document(self, code):
     logevent.title = log_title
     logevent.type = 'submission'
     logevent.status = 'info'
-    logevent.deposit_code = deposit.code
+    logevent.deposit_code = code
     DBSession.add(logevent)
     DBSession.commit()
 
@@ -283,7 +285,7 @@ def prepare_document(self, code):
         logevent.title = log_title
         logevent.type = 'submission'
         logevent.status = 'success'
-        logevent.deposit_code = deposit.code
+        logevent.deposit_code = code
         DBSession.add(logevent)
         DBSession.commit()
 
@@ -301,7 +303,7 @@ def prepare_document(self, code):
     logevent.body = exc
     logevent.type = 'submission'
     logevent.status = 'error'
-    logevent.deposit_code = deposit.code
+    logevent.deposit_code = code
     DBSession.add(logevent)
     DBSession.commit()
     raise ChainAborted(log_title)
@@ -318,7 +320,7 @@ def register_doi(self, code):
         logevent.title = log_title
         logevent.type = 'submission'
         logevent.status = 'info'
-        logevent.deposit_code = deposit.code
+        logevent.deposit_code = code
         DBSession.add(logevent)
         DBSession.commit()
         result = crossref_client.register_doi(code, deposit.submission_xml)
@@ -336,7 +338,7 @@ def register_doi(self, code):
         logevent.body = str(exc)
         logevent.type = 'submission'
         logevent.status = 'error'
-        logevent.deposit_code = deposit.code
+        logevent.deposit_code = code
         DBSession.add(logevent)
         DBSession.commit()
         raise self.retry(exc=ComunicationError(log_title))
@@ -356,7 +358,7 @@ def register_doi(self, code):
         logevent.body = str('HTTP status code %d' % result.status_code)
         logevent.type = 'submission'
         logevent.status = 'error'
-        logevent.deposit_code = deposit.code
+        logevent.deposit_code = code
         DBSession.add(logevent)
         DBSession.commit()
         raise self.retry(exc=RequestError(log_title))
@@ -373,7 +375,7 @@ def register_doi(self, code):
         logevent.body = result.text
         logevent.type = 'submission'
         logevent.status = 'success'
-        logevent.deposit_code = deposit.code
+        logevent.deposit_code = code
         DBSession.add(logevent)
         DBSession.commit()
         return code
@@ -388,7 +390,7 @@ def register_doi(self, code):
     logevent.body = result.text
     logevent.type = 'submission'
     logevent.status = 'error'
-    logevent.deposit_code = deposit.code
+    logevent.deposit_code = code
     DBSession.add(logevent)
     DBSession.commit()
     raise ChainAborted(log_title)
@@ -413,7 +415,7 @@ class CallbackTask(Task):
         logevent.title = log_title
         logevent.type = 'feedback'
         logevent.status = 'error'
-        logevent.deposit_code = deposit.code
+        logevent.deposit_code = code
         DBSession.add(logevent)
         DBSession.commit()
 
@@ -432,7 +434,7 @@ def request_doi_status(self, code):
     logevent.title = log_title
     logevent.type = 'feedback'
     logevent.status = 'info'
-    logevent.deposit_code = deposit.code
+    logevent.deposit_code = code
     DBSession.add(logevent)
     DBSession.commit()
 
@@ -452,7 +454,7 @@ def request_doi_status(self, code):
         logevent.body = str(exc)
         logevent.type = 'feedback'
         logevent.status = 'error'
-        logevent.deposit_code = deposit.code
+        logevent.deposit_code = code
         DBSession.add(logevent)
         DBSession.commit()
         raise self.retry(exc=ComunicationError(log_title))
@@ -471,7 +473,7 @@ def request_doi_status(self, code):
         logevent.body = str('HTTP status code %d' % result.status_code)
         logevent.type = 'feedback'
         logevent.status = 'error'
-        logevent.deposit_code = deposit.code
+        logevent.deposit_code = code
         DBSession.add(logevent)
         DBSession.commit()
         raise self.retry(exc=RequestError(log_title))
@@ -490,7 +492,7 @@ def request_doi_status(self, code):
         logevent.title = log_title
         logevent.type = 'feedback'
         logevent.status = 'info'
-        logevent.deposit_code = deposit.code
+        logevent.deposit_code = code
         DBSession.add(logevent)
         DBSession.commit()
         raise self.retry(exc=UnkownSubmission(log_title))
@@ -509,7 +511,7 @@ def request_doi_status(self, code):
     logevent.body = feedback_body
     logevent.type = 'feedback'
     logevent.status = feedback_status
-    logevent.deposit_code = deposit.code
+    logevent.deposit_code = code
     DBSession.add(logevent)
     DBSession.commit()
 
