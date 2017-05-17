@@ -183,7 +183,6 @@ def prepare_document(self, code):
         depositor_email = xml.find('//{http://www.crossref.org/schema/4.4.0}email_address')
         depositor_email.text = CROSSREF_DEPOSITOR_EMAIL
         doi = xml.find('//{http://www.crossref.org/schema/4.4.0}doi_data/{http://www.crossref.org/schema/4.4.0}doi')
-        rdb.set_trace()
         doi.text = deposit.doi
 
         return xml
