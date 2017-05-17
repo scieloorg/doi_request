@@ -46,7 +46,7 @@ class LogEvent(Base):
     body = Column('body', Text, default='')
     type = Column('type', String(16), nullable=False)
     status = Column('status', String(16))
-    deposit_code = Column('deposit_code', ForeignKey('deposit.code'))
+    deposit_code = Column('deposit_code', ForeignKey('deposit.code'), index=True)
     deposit = relationship("Deposit", back_populates="log_events")
 
 
