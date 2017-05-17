@@ -45,8 +45,8 @@ class UnkownSubmission(CrossrefExceptions):
 class ChainAborted(Exception):
     pass
 
-REGISTER_DOI_DELAY_RETRY = 600
-REQUEST_DOI_DELAY_RETRY = 600
+REGISTER_DOI_DELAY_RETRY = 10
+REQUEST_DOI_DELAY_RETRY = 10
 REGISTER_DOI_DELAY_RETRY_TD = timedelta(seconds=REGISTER_DOI_DELAY_RETRY)
 REQUEST_DOI_DELAY_RETRY_TD = timedelta(seconds=REQUEST_DOI_DELAY_RETRY)
 SUGGEST_DOI_IDENTIFICATION = bool(os.environ.get('SUGGEST_DOI_IDENTIFICATION', False))
@@ -546,6 +546,7 @@ def registry_dispatcher_document(self, code, collection):
         doi_prefix = CROSSREF_PREFIX
         doi = '/'.join([CROSSREF_PREFIX, document.publisher_ahead_id or document.publisher_id])
 
+    logger.info('Setting up deposit metadata for (%s)', document.publisher_id)
     depitem = Deposit(
         code=code,
         pid=document.publisher_id,
@@ -575,15 +576,15 @@ def registry_dispatcher_document(self, code, collection):
 
     deposit = DBSession.add(depitem)
     DBSession.commit()
-
+    logger.info('Queuing deposit tasks for (%s)', document.publisher_id)
     chain(
-        triage_deposit.s(code),
-        load_xml_from_articlemeta.s(),
-        prepare_document.s(),
-        register_doi.s(),
-        request_doi_status.s()
-    ).apply_async()
-
+        triage_deposit.s(code).set(queue='dispatcher'),
+        load_xml_from_articlemeta.s().set(queue='dispatcher'),
+        prepare_document.s().set(queue='dispatcher'),
+        register_doi.s().set(queue='dispatcher'),
+        request_doi_status.s().set(queue='dispatcher')
+    ).delay()
+    logger.info('Deposit tasks queued for (%s)', document.publisher_id)
 
 @app.task(bind=True, max_retries=1)
 def registry_dispatcher(self, pids_list):
