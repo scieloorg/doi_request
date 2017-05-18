@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 from datetime import timedelta
 import calendar
@@ -194,7 +195,7 @@ def deposit_post(request):
 
     pids = request.GET.get('pids', '')
 
-    depositor.deposit_by_pids(['_'.join(['scl', i.strip()]) for i in pids.split('\r')])
+    depositor.deposit_by_pids(['_'.join([os.environ['COLLECTION_ACRONYM'], i.strip()]) for i in pids.split('\r')])
 
     return HTTPFound('/')
 
