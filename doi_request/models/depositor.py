@@ -1,6 +1,6 @@
 from datetime import datetime
 from doi_request.models import Base
-from sqlalchemy import func, ForeignKey, Column, Unicode, Integer, String, Boolean, Text, DateTime
+from sqlalchemy import func, ForeignKey, Column, Unicode, Integer, String, Boolean, Text, DateTime, Float
 from sqlalchemy.orm import relationship
 
 
@@ -57,4 +57,4 @@ class Expenses(Base):
     publication_year = Column('publication_year', Integer, index=True)
     registry_date = Column('registry_date', DateTime(timezone=True), default=datetime.now)
     doi = Column('doi', String(128), index=True)
-    cost = Column('cost', Integer, nullable=False)
+    cost = Column('cost', Float, nullable=False)
