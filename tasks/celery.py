@@ -45,8 +45,10 @@ class UnkownSubmission(CrossrefExceptions):
 class ChainAborted(Exception):
     pass
 
-REGISTER_DOI_DELAY_RETRY = 600
-REQUEST_DOI_DELAY_RETRY = 600
+REQUEST_DOI_MAX_RETRY = os.environ.get('REQUEST_DOI_MAX_RETRY', 20000)
+REGISTER_DOI_MAX_RETRY = os.environ.get('REGISTER_DOI_MAX_RETRY', 20000)
+REGISTER_DOI_DELAY_RETRY = os.environ.get('REGISTER_DOI_DELAY_RETRY', 600)
+REQUEST_DOI_DELAY_RETRY = os.environ.get('REQUEST_DOI_DELAY_RETRY', 600)
 REGISTER_DOI_DELAY_RETRY_TD = timedelta(seconds=REGISTER_DOI_DELAY_RETRY)
 REQUEST_DOI_DELAY_RETRY_TD = timedelta(seconds=REQUEST_DOI_DELAY_RETRY)
 SUGGEST_DOI_IDENTIFICATION = bool(os.environ.get('SUGGEST_DOI_IDENTIFICATION', False))
@@ -308,7 +310,7 @@ def prepare_document(self, code):
     raise ChainAborted(log_title)
 
 
-@app.task(bind=True, default_retry_delay=REGISTER_DOI_DELAY_RETRY, max_retries=20000)
+@app.task(bind=True, default_retry_delay=REGISTER_DOI_DELAY_RETRY, max_retries=REGISTER_DOI_MAX_RETRY)
 def register_doi(self, code):
 
     deposit = DBSession.query(Deposit).filter_by(code=code).first()
@@ -419,7 +421,7 @@ class CallbackTask(Task):
         DBSession.commit()
 
 
-@app.task(base=CallbackTask, bind=True, default_retry_delay=REQUEST_DOI_DELAY_RETRY, max_retries=20000)
+@app.task(base=CallbackTask, bind=True, default_retry_delay=REQUEST_DOI_DELAY_RETRY, max_retries=REQUEST_DOI_MAX_RETRY)
 def request_doi_status(self, code):
 
     deposit = DBSession.query(Deposit).filter_by(code=code).first()
