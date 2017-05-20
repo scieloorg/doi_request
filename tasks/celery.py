@@ -45,12 +45,12 @@ class UnkownSubmission(CrossrefExceptions):
 class ChainAborted(Exception):
     pass
 
-REQUEST_DOI_MAX_RETRY = os.environ.get('REQUEST_DOI_MAX_RETRY', 20000)
-REGISTER_DOI_MAX_RETRY = os.environ.get('REGISTER_DOI_MAX_RETRY', 20000)
-REGISTER_DOI_DELAY_RETRY = os.environ.get('REGISTER_DOI_DELAY_RETRY', 600)
-REQUEST_DOI_DELAY_RETRY = os.environ.get('REQUEST_DOI_DELAY_RETRY', 600)
-REGISTER_DOI_DELAY_RETRY_TD = timedelta(seconds=REGISTER_DOI_DELAY_RETRY)
+REQUEST_DOI_MAX_RETRY = int(os.environ.get('REQUEST_DOI_MAX_RETRY', '20000'))
+REGISTER_DOI_MAX_RETRY = int(os.environ.get('REGISTER_DOI_MAX_RETRY', '20000'))
+REQUEST_DOI_DELAY_RETRY = int(os.environ.get('REQUEST_DOI_DELAY_RETRY', '600'))
+REGISTER_DOI_DELAY_RETRY = int(os.environ.get('REGISTER_DOI_DELAY_RETRY', '600'))
 REQUEST_DOI_DELAY_RETRY_TD = timedelta(seconds=REQUEST_DOI_DELAY_RETRY)
+REGISTER_DOI_DELAY_RETRY_TD = timedelta(seconds=REGISTER_DOI_DELAY_RETRY)
 SUGGEST_DOI_IDENTIFICATION = bool(os.environ.get('SUGGEST_DOI_IDENTIFICATION', False))
 CROSSREF_XSD = open(os.path.dirname(__file__)+'/../xsd/crossref4.4.0.xsd')
 CROSSREF_PREFIX = os.environ.get('CROSSREF_PREFIX', None)
