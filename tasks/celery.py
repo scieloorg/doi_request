@@ -218,7 +218,7 @@ def prepare_document(self, code):
             return (False, xml_doc, str(e))
 
     is_valid, parsed_xml, exc = xml_is_valid(deposit.submission_xml)
-    deposit.submission_xml = etree.tostring(parsed_xml, encoding='utf-8', pretty_print=True).decode('utf-8')
+    deposit.submission_xml = etree.tostring(parsed_xml, encoding='utf-8', pretty_print=True, xml_declaration=True).decode('utf-8')
 
     if is_valid is True:
         log_title = 'XML is valid, it will be submitted to Crossref'
@@ -269,7 +269,7 @@ def prepare_document(self, code):
     is_valid, parsed_xml, exc = xml_is_valid(
         deposit.submission_xml, only_front=True
     )
-    deposit.submission_xml = etree.tostring(parsed_xml, encoding='utf-8', pretty_print=True).decode('utf-8')
+    deposit.submission_xml = etree.tostring(parsed_xml, encoding='utf-8', pretty_print=True, xml_declaration=True).decode('utf-8')
 
     if is_valid is True:
         log_title = 'XML only with front metadata is valid, it will be submitted to Crossref'
