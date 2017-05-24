@@ -15,7 +15,7 @@ from articlemeta.client import ThriftClient
 from crossref.client import CrossrefClient
 from doi_request.models.depositor import Deposit, LogEvent, Expenses
 from doi_request.models import configure_session_engine, DBSession
-from utils import asbool
+from utils.settings import asbool
 
 
 logger = get_task_logger(__name__)
