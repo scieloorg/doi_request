@@ -8,14 +8,15 @@ from datetime import timedelta
 from celery import Celery
 from celery import Task, chain
 from celery.utils.log import get_task_logger
+from celery.contrib import rdb
 from lxml import etree
 from articlemeta.client import ThriftClient
 
 from crossref.client import CrossrefClient
 from doi_request.models.depositor import Deposit, LogEvent, Expenses
 from doi_request.models import configure_session_engine, DBSession
+from utils import asbool
 
-from celery.contrib import rdb
 
 logger = get_task_logger(__name__)
 
@@ -51,7 +52,7 @@ REQUEST_DOI_DELAY_RETRY = int(os.environ.get('REQUEST_DOI_DELAY_RETRY', '600'))
 REGISTER_DOI_DELAY_RETRY = int(os.environ.get('REGISTER_DOI_DELAY_RETRY', '600'))
 REQUEST_DOI_DELAY_RETRY_TD = timedelta(seconds=REQUEST_DOI_DELAY_RETRY)
 REGISTER_DOI_DELAY_RETRY_TD = timedelta(seconds=REGISTER_DOI_DELAY_RETRY)
-SUGGEST_DOI_IDENTIFICATION = bool(os.environ.get('SUGGEST_DOI_IDENTIFICATION', False))
+SUGGEST_DOI_IDENTIFICATION = asbool(os.environ.get('SUGGEST_DOI_IDENTIFICATION', False))
 CROSSREF_XSD = open(os.path.dirname(__file__)+'/../xsd/crossref4.4.0.xsd')
 CROSSREF_PREFIX = os.environ.get('CROSSREF_PREFIX', None)
 CROSSREF_API_USER = os.environ.get('CROSSREF_API_USER', None)
@@ -534,6 +535,7 @@ def registry_dispatcher_document(self, code, collection):
     """
     This task receive a list of codes that should be queued for DOI registry
     """
+
     articlemeta = ThriftClient(domain=ARTICLEMETA_THRIFTSERVER)
     document = articlemeta.document(code, collection)
     code = '_'.join([document.collection_acronym, document.publisher_id])
