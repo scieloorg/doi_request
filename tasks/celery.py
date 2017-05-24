@@ -172,7 +172,7 @@ def load_xml_from_articlemeta(self, code):
 
     return code
 
-@app.task(bind=True, default_retry_delay=REGISTER_DOI_DELAY_RETRY, max_retries=2000)
+@app.task(bind=True, default_retry_delay=60, max_retries=2000)
 def prepare_document(self, code):
 
     deposit = DBSession.query(Deposit).filter_by(code=code).first()
