@@ -523,7 +523,7 @@ def request_doi_status(self, code):
         expenses.publication_year = deposit.publication_year
         expenses.registry_date = datetime.now()
         expenses.doi = deposit.doi
-        expenses.cost = 0.25 if int(deposit.publication_year) < back_file_limit else 1
+        expenses.cost = 0.15 if int(deposit.publication_year) < back_file_limit else 1
         expenses.retro = True if int(deposit.publication_year) < back_file_limit else False
         DBSession.add(expenses)
         DBSession.commit()
@@ -584,7 +584,7 @@ def registry_dispatcher_document(self, code, collection):
         load_xml_from_articlemeta.s().set(queue='dispatcher'),
         prepare_document.s().set(queue='dispatcher'),
         register_doi.s().set(queue='dispatcher'),
-        request_doi_status.s().set(queue='dispatcher')
+        request_doi_status.s().set(queue='releaser')
     ).delay()
     logger.info('Deposit tasks queued for (%s)', document.publisher_id)
 
