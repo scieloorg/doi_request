@@ -32,7 +32,9 @@ def list_deposits(request):
     from_date = request.session['filter_start_range'].split('-')[0].strip()
     from_date_dt = datetime.strptime(request.session['filter_start_range'].split('-')[0].strip(), '%m/%d/%Y')
     total = 0
+    filter_string = []
     if filter_pid_doi:
+        filter_string.append('DOI/PID=%s' % filter_pid_doi)
         deposits = request.db.query(
             Deposit.started_at,
             Deposit.journal,
@@ -47,17 +49,24 @@ def list_deposits(request):
         ).filter(or_(Deposit.doi == filter_pid_doi, Deposit.pid == filter_pid_doi))
     else:
         deposits = request.db.query(Deposit).filter(and_(Deposit.started_at >= from_date_dt, Deposit.started_at <= to_date_dt))
+        filter_string.append('processing_date between %s and %s' % (from_date_dt.isoformat()[:10], to_date_dt.isoformat()[:10]))
         if request.session['filter_feedback_status']:
+            filter_string.append('feedback_status=%s' % request.session['filter_feedback_status'])
             deposits = deposits.filter(Deposit.feedback_status == request.session['filter_feedback_status'])
         if request.session['filter_submission_status']:
+            filter_string.append('submission_status=%s' % request.session['filter_submission_status'])
             deposits = deposits.filter(Deposit.submission_status == request.session['filter_submission_status'])
         if request.session['filter_issn']:
+            filter_string.append('issn=%s' % request.session['filter_issn'])
             deposits = deposits.filter(Deposit.issn == request.session['filter_issn'])
         if request.session['filter_prefix']:
+            filter_string.append('prefix=%s' % request.session['filter_prefix'])
             deposits = deposits.filter(Deposit.prefix == request.session['filter_prefix'])
         if request.session['filter_journal_acronym']:
+            filter_string.append('journal_acronym=%s' % request.session['filter_journal_acronym'])
             deposits = deposits.filter(Deposit.journal_acronym == request.session['filter_journal_acronym'])
         if request.session['filter_has_valid_references']:
+            filter_string.append('has_valid_references=%s' % request.session['filter_has_valid_references'])
             deposits = deposits.filter(Deposit.has_submission_xml_valid_references == request.session['filter_has_valid_references'])
 
     total = deposits.count()
@@ -74,6 +83,7 @@ def list_deposits(request):
     data['filter_submission_status'] = request.session['filter_submission_status']
     data['filter_issn'] = request.session['filter_issn']
     data['filter_prefix'] = request.session['filter_prefix']
+    data['filter_string'] = filter_string
     data['offset'] = request.session['deposits_offset']
     data['limit'] = LIMIT if LIMIT <= total else total + 1
     data['total'] = total

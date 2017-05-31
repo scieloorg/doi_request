@@ -5,6 +5,7 @@
   <div class="box box-primary collapsed-box">
     <div class="box-header with-border">
       <h3 class="box-title">${_('Filtros')}</h3>
+      <span class="visible-md visible-lg">${ filter_string }</span>
       <div class="box-tools pull-right">
         <button type="button" class="btn btn-box-tool" data-widget="collapse"><i class="fa fa-plus"></i>
         </button>

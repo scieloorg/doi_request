@@ -43,7 +43,7 @@ def check_session(wrapped):
         filter_journal_acronym = request.GET.get(
             'filter_journal_acronym',
             request.session.get('filter_journal_acronym', '')
-        )
+        ).lower()
         filter_has_valid_references = request.GET.get(
             'filter_has_valid_references',
             request.session.get('filter_has_valid_references', '')
