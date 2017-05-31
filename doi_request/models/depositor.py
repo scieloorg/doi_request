@@ -37,6 +37,14 @@ class Deposit(Base):
     def timeline(self):
         return sorted(self.log_events, key=lambda event: event.date)
 
+    @property
+    def is_pending(self):
+        pending_list = ['', 'waiting']
+        if self.submission_status in pending_list or self.feedback_status in pending_list:
+            return True
+
+        return False
+
 
 class LogEvent(Base):
     __tablename__ = 'logevent'

@@ -38,9 +38,15 @@
       </div>
       <div class="row">
         <div class="col-md-12 col-sm-24 col-xs-48">
-          <a href="${request.route_url('deposit_post')}?pids=${deposit.pid}">
-            <button type="button" class="btn btn-primary btn-sm pull-right"><i class="fa fa-cloud-upload"></i> ${_(u'resubmeter')}</button>
-          </a>
+          % if deposit.is_pending is True:
+            <a href="#">
+              <button type="button" class="btn btn-primary btn-sm pull-right disabled"><i class="fa fa-cloud-upload"></i> ${_(u'resubmeter')}</button>
+            </a>
+          % else:
+            <a href="${request.route_url('deposit_post')}?pids=${deposit.pid}">
+              <button type="button" class="btn btn-primary btn-sm pull-right"><i class="fa fa-cloud-upload"></i> ${_(u'resubmeter')}</button>
+            </a>
+          % endif
         </div>
       </div>
     </div>

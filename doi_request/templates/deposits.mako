@@ -120,9 +120,15 @@
               <a href="${request.route_url('deposit')}?code=${item.code}">
                 <button type="button" class="btn btn-primary btn-sm"><i class="fa fa-folder-open"></i> ${_(u'detalhes')}</button>
               </a>
-              <a href="${request.route_url('deposit_post')}?pids=${item.pid}">
-                <button type="button" class="btn btn-primary btn-sm"><i class="fa fa-cloud-upload"></i> ${_(u'resubmeter')}</button>
-              </a>
+              % if item.is_pending is True:
+                <a href="#">
+                  <button type="button" class="btn btn-primary btn-sm disabled"><i class="fa fa-cloud-upload"></i> ${_(u'resubmeter')}</button>
+                </a>
+              % else:
+                <a href="${request.route_url('deposit_post')}?pids=${item.pid}">
+                  <button type="button" class="btn btn-primary btn-sm"><i class="fa fa-cloud-upload"></i> ${_(u'resubmeter')}</button>
+                </a>
+              % endif
               </td>
             </tr>
             % endfor

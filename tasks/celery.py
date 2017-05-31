@@ -46,6 +46,10 @@ class UnkownSubmission(CrossrefExceptions):
 class ChainAborted(Exception):
     pass
 
+
+class SubmissionAlreadyInAnotherThread(ChainAborted):
+    pass
+
 REQUEST_DOI_MAX_RETRY = int(os.environ.get('REQUEST_DOI_MAX_RETRY', '20000'))
 REGISTER_DOI_MAX_RETRY = int(os.environ.get('REGISTER_DOI_MAX_RETRY', '20000'))
 REQUEST_DOI_DELAY_RETRY = int(os.environ.get('REQUEST_DOI_DELAY_RETRY', '600'))
@@ -549,6 +553,12 @@ def registry_dispatcher_document(self, code, collection):
     if SUGGEST_DOI_IDENTIFICATION is True and not doi:
         doi_prefix = CROSSREF_PREFIX
         doi = '/'.join([CROSSREF_PREFIX, document.publisher_ahead_id or document.publisher_id])
+
+    deposit = DBSession.query(Deposit).filter_by(code=code).first()
+
+    if deposit and deposit.is_pending is True:
+        DBSession.commit()
+        raise SubmissionAlreadyInAnotherThread()
 
     logger.info('Setting up deposit metadata for (%s)', document.publisher_id)
     depitem = Deposit(
