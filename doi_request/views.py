@@ -35,18 +35,7 @@ def list_deposits(request):
     filter_string = []
     if filter_pid_doi:
         filter_string.append('DOI/PID=%s' % filter_pid_doi)
-        deposits = request.db.query(
-            Deposit.started_at,
-            Deposit.journal,
-            Deposit.journal_acronym,
-            Deposit.code,
-            Deposit.prefix,
-            Deposit.pid,
-            Deposit.issue_label,
-            Deposit.has_submission_xml_valid_references,
-            Deposit.feedback_status,
-            Deposit.submission_status
-        ).filter(or_(Deposit.doi == filter_pid_doi, Deposit.pid == filter_pid_doi))
+        deposits = request.db.query(Deposit).filter(or_(Deposit.doi == filter_pid_doi, Deposit.pid == filter_pid_doi))
     else:
         deposits = request.db.query(Deposit).filter(and_(Deposit.started_at >= from_date_dt, Deposit.started_at <= to_date_dt))
         filter_string.append('processing_date between %s and %s' % (from_date_dt.isoformat()[:10], to_date_dt.isoformat()[:10]))
