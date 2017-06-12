@@ -56,9 +56,14 @@ def check_session(wrapped):
             'expenses_offset',
             request.session.get('expenses_offset', 0)
         )
+        expenses_period = request.GET.get(
+            'expenses_period',
+            request.session.get('expenses_period', datetime.now().isoformat())
+        )
 
         request.session['deposits_offset'] = int(deposits_offset)
         request.session['expenses_offset'] = int(expenses_offset)
+        request.session['expenses_period'] = expenses_period
         request.session['filter_issn'] = filter_issn
         request.session['filter_submission_status'] = filter_submission_status
         request.session['filter_feedback_status'] = filter_feedback_status

@@ -159,7 +159,7 @@ def expenses_details(request):
 
     data = request.data_manager
 
-    period = request.GET.get('period', datetime.now().isoformat())
+    period = request.session['expenses_period']
     period = datetime.strptime(period[0:7], '%Y-%m')
 
     week_day, last_day = calendar.monthrange(period.year, period.month)
