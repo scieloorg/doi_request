@@ -36,7 +36,7 @@ tests_require = [
 
 setup(
     name="doi_request",
-    version="1.1.1",
+    version="1.2.0",
     description="Tool to manage the DOI registering process",
     long_description=README + '\n\n' + CHANGES,
     author="SciELO",

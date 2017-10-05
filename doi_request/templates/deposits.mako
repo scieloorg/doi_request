@@ -12,7 +12,7 @@
       </div>
     </div>
     <div class="box-body">
-      <form name="filter" action="${request.route_url('list_deposits')}" method="get">
+      <form name="filter" action="${request.route_url('list_deposits')}" method="posts">
         <div class="form-group">
           <label>${_(u'ISSN')}</label>
             <input name="filter_issn" type="text" class="form-control" value="${filter_issn or ''}"></input>
