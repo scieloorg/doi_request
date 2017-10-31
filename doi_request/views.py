@@ -193,8 +193,9 @@ def deposit_post(request):
     data = request.data_manager
 
     pids = request.POST.get('pids', '')
+    pids += '\r'+request.GET.get('pids', '')
 
-    depositor.deposit_by_pids(['_'.join([os.environ['COLLECTION_ACRONYM'], i.strip()]) for i in pids.split('\r')])
+    depositor.deposit_by_pids(['_'.join([os.environ['COLLECTION_ACRONYM'], i.strip()]) for i in pids.split('\r') if i])
 
     return HTTPFound('/')
 
