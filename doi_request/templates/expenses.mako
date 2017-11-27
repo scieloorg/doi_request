@@ -12,7 +12,7 @@
       </tr>
     </thead>
     <tbody>
-      % for key, item in expenses.items():
+      % for key, item in sorted(expenses.items(), reverse=True):
         <tr>
           <td>${key}</td>
           <td>$ ${format(item['retro'], '.2f')}</td>

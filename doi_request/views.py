@@ -129,9 +129,10 @@ def expenses(request):
         Expenses.retro,
         func.date_trunc('month', Expenses.registry_date).label('registry_month'),
         func.sum(Expenses.cost).label('total')
-    ).group_by('registry_month').group_by(Expenses.retro).order_by(desc('registry_month'))
+    ).group_by('registry_month').group_by(Expenses.retro)
 
     result = {}
+
     for item in [i._asdict() for i in expenses]:
         key = item['registry_month'].isoformat()[:7]
         result.setdefault(key, {

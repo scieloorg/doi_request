@@ -17,7 +17,7 @@ install_requires = [
     'pyramid_debugtoolbar',
     'waitress',
     'Babel',
-    'articlemetaapi>=1.23.0',
+    'articlemetaapi>=1.24.0',
     'lxml',
     'mongoengine',
     'celery',
@@ -36,7 +36,7 @@ tests_require = [
 
 setup(
     name="doi_request",
-    version="1.3.0",
+    version="1.4.0",
     description="Tool to manage the DOI registering process",
     long_description=README + '\n\n' + CHANGES,
     author="SciELO",
