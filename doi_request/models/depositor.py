@@ -40,10 +40,11 @@ class Deposit(Base):
     @property
     def is_pending(self):
         pending_list = ['', 'waiting']
-        if self.submission_status in pending_list or self.feedback_status in pending_list:
+        if (self.submission_status in pending_list or 
+            self.feedback_status in pending_list) and self.submission_xml:
             return True
-
-        return False
+        else:
+            return False
 
 
 class LogEvent(Base):
