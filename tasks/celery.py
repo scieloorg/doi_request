@@ -566,40 +566,36 @@ def registry_dispatcher_document(self, code, collection):
 
     exc_class = None
 
+    logger.info('Setting up deposit metadata for (%s)', document.publisher_id)
+    depitem = Deposit(
+        code=code,
+        pid=document.publisher_id,
+        issn=document.journal.scielo_issn,
+        volume=document.issue.volume,
+        number=document.issue.number,
+        issue_label=document.issue.label,
+        journal=document.journal.title,
+        journal_acronym=document.journal.acronym,
+        collection_acronym=document.collection_acronym,
+        xml_file_name=xml_file_name,
+        doi=doi,
+        publication_year=int(document.publication_date[0:4]),
+        prefix=doi_prefix,
+        has_submission_xml_valid_references=False,
+        submission_updated_at=now,
+        submission_status='waiting',
+        updated_at=now,
+        started_at=now
+    )
+
     with transactional_session() as session:
         deposit = session.query(Deposit).filter_by(code=code).first()
+        if deposit:
+            logger.info('deposit already exists. it will be deleted and '
+                        're-created: "%s"', repr(deposit))
+            session.delete(deposit)
 
-        if deposit and deposit.is_pending is True:
-            exc_class = SubmissionAlreadyInAnotherThread
-
-        else:
-            logger.info('Setting up deposit metadata for (%s)', document.publisher_id)
-            depitem = Deposit(
-                code=code,
-                pid=document.publisher_id,
-                issn=document.journal.scielo_issn,
-                volume=document.issue.volume,
-                number=document.issue.number,
-                issue_label=document.issue.label,
-                journal=document.journal.title,
-                journal_acronym=document.journal.acronym,
-                collection_acronym=document.collection_acronym,
-                xml_file_name=xml_file_name,
-                doi=doi,
-                publication_year=int(document.publication_date[0:4]),
-                prefix=doi_prefix,
-                has_submission_xml_valid_references=False,
-                submission_updated_at=now,
-                submission_status='waiting',
-                updated_at=now,
-                started_at=now
-            )
-
-            deposit = session.query(Deposit).filter_by(code=code).first()
-            if deposit:
-                session.delete(deposit)
-
-            deposit = session.add(depitem)
+        deposit = session.add(depitem)
 
     if exc_class:
         raise exc_class()
@@ -613,6 +609,7 @@ def registry_dispatcher_document(self, code, collection):
         request_doi_status.s().set(queue='releaser')
     ).delay()
     logger.info('Deposit tasks queued for (%s)', document.publisher_id)
+
 
 @app.task(bind=True, max_retries=1)
 def registry_dispatcher(self, pids_list):
