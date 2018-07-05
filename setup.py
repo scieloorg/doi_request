@@ -10,8 +10,7 @@ with open(os.path.join(here, 'CHANGES.txt')) as f:
     CHANGES = f.read()
 
 install_requires = [
-    'thriftpy==0.3.1',
-    'requests==2.11.1',
+    'requests==2.19.1',
     'pyramid',
     'pyramid_mako',
     'pyramid_debugtoolbar',
@@ -19,7 +18,6 @@ install_requires = [
     'Babel',
     'articlemetaapi>=1.24.0',
     'lxml',
-    'mongoengine',
     'celery',
     'SQLAlchemy',
     'psycopg2',

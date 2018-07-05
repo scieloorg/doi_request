@@ -6,7 +6,6 @@ import calendar
 from pyramid.httpexceptions import HTTPFound
 from pyramid.view import view_config
 import pyramid.httpexceptions as exc
-from mongoengine.queryset.visitor import Q
 
 from sqlalchemy import desc, func, or_, and_
 
