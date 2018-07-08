@@ -1,0 +1,165 @@
+version: '2'
+
+networks:
+  appnetwork:
+    driver: bridge
+
+services:
+  alembic-upgrade:
+    image: ${APP_IMAGE}
+    environment:
+      ARTICLEMETA_ADMINTOKEN: ${ARTICLEMETA_ADMINTOKEN}
+      ARTICLEMETA_THRIFTSERVER: ${ARTICLEMETA_THRIFTSERVER}
+      COLLECTION_ACRONYM: ${COLLECTION_ACRONYM}
+      CROSSREF_API_PASSWORD: ${CROSSREF_API_PASSWORD}
+      CROSSREF_API_USER: ${CROSSREF_API_USER}
+      CROSSREF_DEPOSITOR_EMAIL: ${CROSSREF_DEPOSITOR_EMAIL}
+      CROSSREF_DEPOSITOR_NAME: ${CROSSREF_DEPOSITOR_NAME}
+      CROSSREF_PREFIX: ${CROSSREF_PREFIX}
+      LOGGING_LEVEL: ${LOGGING_LEVEL}
+      SQL_ENGINE: postgresql://postgres:password@db:5432/doi_manager
+    networks:
+    - appnetwork
+    command:
+    - alembic
+    - upgrade
+    - head
+    depends_on:
+    - db
+  celeryworker:
+    image: ${APP_IMAGE}
+    environment:
+      COLLECTION_ACRONYM: ${COLLECTION_ACRONYM}
+      CROSSREF_API_PASSWORD: ${CROSSREF_API_PASSWORD}
+      CROSSREF_API_USER: ${CROSSREF_API_USER}
+      CROSSREF_DEPOSITOR_EMAIL: ${CROSSREF_DEPOSITOR_EMAIL}
+      CROSSREF_DEPOSITOR_NAME: ${CROSSREF_DEPOSITOR_NAME}
+      CROSSREF_PREFIX: ${CROSSREF_PREFIX}
+      C_FORCE_ROOT: 'true'
+      SQL_ENGINE: postgresql://postgres:password@db:5432/doi_manager
+      SUGGEST_DOI_IDENTIFICATION: 'False'
+      USE_DOCKER: 'true'
+    networks:
+    - appnetwork
+    command:
+    - celery
+    - -A
+    - tasks.celery
+    - worker
+    - -l
+    - INFO
+    depends_on:
+    - db
+    - rabbitmq
+    - dashboard
+  exportdoi:
+    image: ${APP_IMAGE}
+    environment:
+      ARTICLEMETA_ADMINTOKEN: ${ARTICLEMETA_ADMINTOKEN}
+      ARTICLEMETA_THRIFTSERVER: ${ARTICLEMETA_THRIFTSERVER}
+      COLLECTION_ACRONYM: ${COLLECTION_ACRONYM}
+      CROSSREF_API_PASSWORD: ${CROSSREF_API_PASSWORD}
+      CROSSREF_API_USER: ${CROSSREF_API_USER}
+      CROSSREF_DEPOSITOR_EMAIL: ${CROSSREF_DEPOSITOR_EMAIL}
+      CROSSREF_DEPOSITOR_NAME: ${CROSSREF_DEPOSITOR_NAME}
+      CROSSREF_PREFIX: ${CROSSREF_PREFIX}
+      LOGGING_LEVEL: ${LOGGING_LEVEL}
+      SQL_ENGINE: postgresql://postgres:password@db:5432/doi_manager
+    command:
+    - processing_export_doi
+    - -c
+    - scl
+    - -r
+    - '35'
+    depends_on:
+    - celeryworker
+  celeryworker-dispatcher:
+    image: ${APP_IMAGE}
+    environment:
+      COLLECTION_ACRONYM: ${COLLECTION_ACRONYM}
+      CROSSREF_API_PASSWORD: ${CROSSREF_API_PASSWORD}
+      CROSSREF_API_USER: ${CROSSREF_API_USER}
+      CROSSREF_DEPOSITOR_EMAIL: ${CROSSREF_DEPOSITOR_EMAIL}
+      CROSSREF_DEPOSITOR_NAME: ${CROSSREF_DEPOSITOR_NAME}
+      CROSSREF_PREFIX: ${CROSSREF_PREFIX}
+      C_FORCE_ROOT: 'true'
+      REGISTER_DOI_DELAY_RETRY: '600'
+      REGISTER_DOI_MAX_RETRY: '20000'
+      SQL_ENGINE: postgresql://postgres:password@db:5432/doi_manager
+      USE_DOCKER: 'true'
+    networks:
+    - appnetwork
+    command:
+    - celery
+    - -A
+    - tasks.celery
+    - worker
+    - -l
+    - INFO
+    - -Q
+    - dispatcher
+    depends_on:
+    - celeryworker
+  rabbitmq:
+    image: rabbitmq
+    networks:
+    - appnetwork
+  celeryworker-releaser:
+    image: ${APP_IMAGE}
+    environment:
+      COLLECTION_ACRONYM: ${COLLECTION_ACRONYM}
+      CROSSREF_API_PASSWORD: ${CROSSREF_API_PASSWORD}
+      CROSSREF_API_USER: ${CROSSREF_API_USER}
+      CROSSREF_DEPOSITOR_EMAIL: ${CROSSREF_DEPOSITOR_EMAIL}
+      CROSSREF_DEPOSITOR_NAME: ${CROSSREF_DEPOSITOR_NAME}
+      CROSSREF_PREFIX: ${CROSSREF_PREFIX}
+      C_FORCE_ROOT: 'true'
+      REQUEST_DOI_DELAY_RETRY: '600'
+      REQUEST_DOI_MAX_RETRY: '20000'
+      SQL_ENGINE: postgresql://postgres:password@db:5432/doi_manager
+      USE_DOCKER: 'true'
+    networks:
+    - appnetwork
+    command:
+    - celery
+    - -A
+    - tasks.celery
+    - worker
+    - -l
+    - INFO
+    - -Q
+    - releaser
+    depends_on:
+    - celeryworker
+  dashboard:
+    image: ${APP_IMAGE}
+    environment:
+      ARTICLEMETA_ADMINTOKEN: ${ARTICLEMETA_ADMINTOKEN}
+      ARTICLEMETA_THRIFTSERVER: ${ARTICLEMETA_THRIFTSERVER}
+      COLLECTION_ACRONYM: ${COLLECTION_ACRONYM}
+      CROSSREF_API_PASSWORD: ${CROSSREF_API_PASSWORD}
+      CROSSREF_API_USER: ${CROSSREF_API_USER}
+      CROSSREF_DEPOSITOR_EMAIL: ${CROSSREF_DEPOSITOR_EMAIL}
+      CROSSREF_DEPOSITOR_NAME: ${CROSSREF_DEPOSITOR_NAME}
+      CROSSREF_PREFIX: ${CROSSREF_PREFIX}
+      LOGGING_LEVEL: ${LOGGING_LEVEL}
+      SQL_ENGINE: postgresql://postgres:password@db:5432/doi_manager
+      STATIC_MEDIA: /app/doi_request/media
+    networks:
+    - appnetwork
+    ports:
+    - 6543:6543/tcp
+    command:
+    - pserve
+    - /app/config.ini
+    - --reload
+    depends_on:
+    - db
+  db:
+    image: postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: doi_manager
+    networks:
+    - appnetwork
