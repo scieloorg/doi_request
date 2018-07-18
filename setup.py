@@ -11,9 +11,7 @@ install_requires = [
     'requests==2.19.1',
     'pyramid',
     'pyramid_mako',
-    'pyramid_debugtoolbar',
     'waitress',
-    'Babel',
     'articlemetaapi>=1.24.0',
     'lxml',
     'celery',
@@ -36,8 +34,8 @@ setup(
     author_email="scielo-dev@googlegroups.com",
     maintainer="Fabio Batalha",
     maintainer_email="fabio.batalha@scielo.org",
-    url="http://github.com/scieloorg/processing",
-    packages=find_packages(),
+    url="http://github.com/scieloorg/doi_request",
+    packages=find_packages(exclude=["*.tests", "*.tests.*", "tests.*", "tests"]),
     include_package_data=True,
     classifiers=[
         "Development Status :: 4 - Beta",
@@ -56,6 +54,7 @@ setup(
     tests_require=tests_require,
     test_suite='tests',
     install_requires=install_requires,
+    extras_require={'dev': ['pyramid_debugtoolbar', 'Babel']},
     entry_points={
         'paste.app_factory': [
             'main = doi_request:main',
