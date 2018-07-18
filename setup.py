@@ -6,8 +6,6 @@ from setuptools import setup, find_packages
 here = os.path.abspath(os.path.dirname(__file__))
 with open(os.path.join(here, 'README.rst')) as f:
     README = f.read()
-with open(os.path.join(here, 'CHANGES.txt')) as f:
-    CHANGES = f.read()
 
 install_requires = [
     'requests==2.19.1',
@@ -26,9 +24,6 @@ install_requires = [
 ]
 
 tests_require = [
-    'WebTest >= 1.3.1',  # py3 compat
-    'pytest',
-    'pytest-cov',
 ]
 
 
@@ -36,7 +31,7 @@ setup(
     name="doi_request",
     version="1.4.0",
     description="Tool to manage the DOI registering process",
-    long_description=README + '\n\n' + CHANGES,
+    long_description=README + '\n',
     author="SciELO",
     author_email="scielo-dev@googlegroups.com",
     maintainer="Fabio Batalha",
@@ -61,11 +56,6 @@ setup(
     tests_require=tests_require,
     test_suite='tests',
     install_requires=install_requires,
-    # entry_points="""
-    # [console_scripts]
-    # processing_export_doi=processing.exportDOI:main
-    # main=doi_request:main
-    # """
     entry_points={
         'paste.app_factory': [
             'main = doi_request:main',

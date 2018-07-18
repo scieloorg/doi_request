@@ -1,3 +1,0 @@
-[run]
-source = doi_request
-omit = doi_request/test*
