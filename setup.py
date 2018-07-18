@@ -35,7 +35,7 @@ setup(
     maintainer="Fabio Batalha",
     maintainer_email="fabio.batalha@scielo.org",
     url="http://github.com/scieloorg/doi_request",
-    packages=find_packages(exclude=["*.tests", "*.tests.*", "tests.*", "tests"]),
+    packages=find_packages(exclude=["alembic", "*.tests", "*.tests.*", "tests.*", "tests"]),
     include_package_data=True,
     classifiers=[
         "Development Status :: 4 - Beta",

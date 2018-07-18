@@ -12,6 +12,7 @@ MAINTAINER gustavo.fonseca@scielo.org
 COPY --from=build /deps/* /deps/
 COPY production.ini-TEMPLATE /app/config.ini
 COPY alembic.ini-TEMPLATE /app/alembic.ini
+COPY alembic /app/alembic/
 COPY requirements.txt .
 
 RUN apk add --no-cache --virtual .build-deps \
