@@ -1,11 +1,16 @@
 import re
 import logging
-import re
-
 try:
     from configparser import ConfigParser
 except:
     from ConfigParser import ConfigParser
+
+try:
+    from raven.handlers.logging import SentryHandler
+    from raven.conf import setup_logging
+except ImportError:
+    SentryHandler = setup_logging = None
+
 
 logger = logging.getLogger(__name__)
 
@@ -23,3 +28,16 @@ def ckeck_given_issns(issns):
         valid_issns.append(issn)
 
     return valid_issns
+
+
+def setup_sentry(dsn):
+    if SentryHandler and setup_logging:
+        if dsn:
+            handler = SentryHandler(dsn)
+            handler.setLevel(logging.ERROR)
+            setup_logging(handler)
+            logger.info('log handler for Sentry was successfuly set up')
+        else:
+            logger.info('cannot setup handler for Sentry: missing DSN')
+    else:
+        logger.info('cannot setup handler for Sentry: make sure raven is installed')

@@ -5,67 +5,20 @@ Este processamento realiza a exportação de registros SciELO para o Crossref
 import os
 import argparse
 import logging
-import logging.config
-import codecs
-import json
 from datetime import datetime, timedelta
 
 from articlemeta.client import ThriftClient
-from pyramid.config import Configurator
 
 from doi_request.controller import Depositor
 from processing import utils
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('exportDOI')
+
+LOGGER_FMT = '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
 
 FROM = datetime.now() - timedelta(days=30)
 FROM = FROM.isoformat()[:10]
 UNTIL = datetime.now().isoformat()[:10]
-
-SENTRY_HANDLER = os.environ.get('SENTRY_HANDLER', None)
-LOGGING_LEVEL = os.environ.get('LOGGING_LEVEL', 'DEBUG')
-
-LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': True,
-
-    'formatters': {
-        'console': {
-            'format': '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-            'datefmt': '%H:%M:%S',
-            },
-        },
-    'handlers': {
-        'console': {
-            'level': LOGGING_LEVEL,
-            'class': 'logging.StreamHandler',
-            'formatter': 'console'
-            }
-        },
-    'loggers': {
-        '': {
-            'handlers': ['console'],
-            'level': LOGGING_LEVEL,
-            'propagate': False,
-        },
-        'processing.exportDOI': {
-            'level': LOGGING_LEVEL,
-            'propagate': True,
-        },
-        'doi_request': {
-            'level': LOGGING_LEVEL,
-            'propagate': True,
-        },
-    }
-}
-
-if SENTRY_HANDLER:
-    LOGGING['handlers']['sentry'] = {
-        'level': 'ERROR',
-        'class': 'raven.handlers.logging.SentryHandler',
-        'dsn': SENTRY_HANDLER,
-    }
-    LOGGING['loggers']['']['handlers'].append('sentry')
 
 
 class ExportDOI(object):
@@ -131,7 +84,8 @@ def main():
     parser.add_argument(
         '--collection',
         '-c',
-        help='Collection Acronym'
+        help='Collection Acronym',
+        required=True
     )
 
     parser.add_argument(
@@ -158,16 +112,21 @@ def main():
     parser.add_argument(
         '--logging_level',
         '-l',
-        default=LOGGING_LEVEL,
+        default='INFO',
         choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
         help='Logging level'
     )
 
+    parser.add_argument(
+        '--sentry_handler',
+        default='',
+        help='Sentry DSN. This option has precedence over SENTRY_HANDLER env var'
+    )
     args = parser.parse_args()
-    LOGGING['handlers']['console']['level'] = args.logging_level
-    for content in LOGGING['loggers'].values():
-        content['level'] = args.logging_level
-    logging.config.dictConfig(LOGGING)
+
+    logging.basicConfig(level=getattr(logging, args.logging_level.upper(), 'INFO'),
+            format=LOGGER_FMT)
+    utils.setup_sentry(args.sentry_handler or os.environ.get('SENTRY_HANDLER', ''))
 
     logger.info('Dumping data for: %s' % args.collection)
 
