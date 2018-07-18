@@ -8,7 +8,7 @@ import requests
 
 class CrossrefClient(object):
 
-    def __init__(self, prefix, api_user, api_key, test_mode=False):
+    def __init__(self, prefix, api_user, api_key):
 
         self.prefix = prefix
         self.api_user = api_user

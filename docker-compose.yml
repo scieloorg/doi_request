@@ -59,7 +59,7 @@ services:
       CROSSREF_PREFIX: ${CROSSREF_PREFIX}
       LOGGING_LEVEL: ${LOGGING_LEVEL}
       SQL_ENGINE: postgresql://postgres:password@db:5432/doi_manager
-    command: ["processing_export_doi", "-t", "-c", "scl", "-r", "7", "-l", "DEBUG"]
+    command: ["processing_export_doi", "-c", "scl", "-r", "7", "-l", "DEBUG"]
     depends_on:
     - celeryworker
   celeryworker-dispatcher:

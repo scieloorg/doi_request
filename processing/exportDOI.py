@@ -24,7 +24,7 @@ UNTIL = datetime.now().isoformat()[:10]
 class ExportDOI(object):
 
     def __init__(self, collection, issns=None, output_file=None, from_date=FROM,
-                 until_date=UNTIL, test_mode=False):
+                 until_date=UNTIL):
 
         self._articlemeta = ThriftClient(domain=os.environ.get('ARTICLEMETA_THRIFTSERVER', 'articlemeta.scielo.org:11621'))
         self._depositor = Depositor()
@@ -72,13 +72,6 @@ def main():
         '-i',
         default=None,
         help='Full path to a txt file within a list of ISSNs to be exported'
-    )
-
-    parser.add_argument(
-        '--test_mode',
-        '-t',
-        action='store_true',
-        help='Set submission mode to Test Mode. It will use the Crossref Testing API '
     )
 
     parser.add_argument(
@@ -154,7 +147,6 @@ def main():
         issns,
         from_date=args.from_date,
         until_date=args.until_date,
-        test_mode=args.test_mode
     )
 
     export.run()
