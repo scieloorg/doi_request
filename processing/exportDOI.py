@@ -23,10 +23,11 @@ UNTIL = datetime.now().isoformat()[:10]
 
 class ExportDOI(object):
 
-    def __init__(self, collection, issns=None, output_file=None, from_date=FROM,
-                 until_date=UNTIL):
+    def __init__(self, collection, issns=None, from_date=FROM,
+            until_date=UNTIL):
 
-        self._articlemeta = ThriftClient(domain=os.environ.get('ARTICLEMETA_THRIFTSERVER', 'articlemeta.scielo.org:11621'))
+        self._articlemeta = ThriftClient(domain=os.environ.get(
+            'ARTICLEMETA_THRIFTSERVER', 'articlemeta.scielo.org:11621'))
         self._depositor = Depositor()
         self.collection = collection
         self.from_date = from_date
@@ -34,11 +35,9 @@ class ExportDOI(object):
         self.issns = issns or [None]
 
     def run(self):
-        logger.info('Processing Started')
-        logger.info('Date range (%s) to (%s)',  self.from_date, self.until_date)
-        logger.info('Processing will setup a list of documents to have their DOI registry scheduled')
+        logger.info('started collecting articles with processing dates '
+                    'between "%s" and "%s"', self.from_date, self.until_date)
         count = 0
-        docs = []
         for issn in self.issns:
 
             for document in self._articlemeta.documents(
@@ -47,12 +46,11 @@ class ExportDOI(object):
                     only_identifiers=True):
 
                 code = '_'.join([document.collection, document.code])
-                logger.debug('Including document to schedule list (%s)', code)
-                docs.append(code)
+                logger.info('collecting document for deposit: %s', code)
+                self._depositor.deposit_by_pids([code])
+                count += 1
 
-        self._depositor.deposit_by_pids(docs)
-        logger.info('Schedule finished %d documents sent to processing cue', len(docs))
-        logger.info('Processing Finished')
+        logger.info('finished collecting documents. total: %d', count)
 
 
 def main():
