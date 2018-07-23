@@ -4,6 +4,7 @@ from io import BytesIO
 import pickle
 from datetime import datetime
 from datetime import timedelta
+import functools
 
 from celery import Celery
 from celery import Task, chain
@@ -82,7 +83,19 @@ def _parse_schema():
 
 PARSED_SCHEMA = _parse_schema()
 
+
+def log_call(f):
+    @functools.wraps(f)
+    def _f(*args):
+        logger.info('started the `%s` stage for "%s"', f.__name__, args[1:])
+        r = f(*args)
+        logger.info('finished the `%s` stage for "%s"', f.__name__, args[1:])
+        return r
+    return _f 
+
+
 @app.task(bind=True, max_retries=1)
+@log_call
 def triage_deposit(self, code):
     log_title = ''
 
@@ -90,6 +103,8 @@ def triage_deposit(self, code):
         deposit = session.query(Deposit).filter_by(code=code).first()
 
         if not deposit.doi:
+            logger.info('cannot get DOI from deposit "%s" of code "%s"',
+                    repr(deposit), code)
             now = datetime.now()
             log_title = 'DOI number not defined for this document'
             deposit.submission_status = 'error'
@@ -103,6 +118,8 @@ def triage_deposit(self, code):
             session.add(logevent)
 
         elif deposit.prefix.lower() != CROSSREF_PREFIX.lower():
+            logger.info('cannot proceed to deposit: prefix mismatching',
+                    repr(deposit), code)
             now = datetime.now()
             log_title = 'DOI prefix of this document (%s) do no match with the collection prefix (%s)' % (deposit.prefix, CROSSREF_PREFIX)
             deposit.submission_status = 'notapplicable'
@@ -124,6 +141,7 @@ def triage_deposit(self, code):
 
 
 @app.task(bind=True, default_retry_delay=60, max_retries=100)
+@log_call
 def load_xml_from_articlemeta(self, code):
     articlemeta = ThriftClient(domain=ARTICLEMETA_THRIFTSERVER)
 
@@ -179,7 +197,9 @@ def load_xml_from_articlemeta(self, code):
 
     return code
 
+
 @app.task(bind=True, default_retry_delay=60, max_retries=2000)
+@log_call
 def prepare_document(self, code):
     with transactional_session() as session:
         deposit = session.query(Deposit).filter_by(code=code).first()
@@ -314,6 +334,7 @@ def prepare_document(self, code):
 
 
 @app.task(bind=True, default_retry_delay=REGISTER_DOI_DELAY_RETRY, max_retries=REGISTER_DOI_MAX_RETRY)
+@log_call
 def register_doi(self, code):
     should_abort_chain, exc_class, exc_log_title = (False, None, '')
 
@@ -432,6 +453,7 @@ class CallbackTask(Task):
 
 
 @app.task(base=CallbackTask, bind=True, default_retry_delay=REQUEST_DOI_DELAY_RETRY, max_retries=REQUEST_DOI_MAX_RETRY)
+@log_call
 def request_doi_status(self, code):
     exc_class, exc_log_title = (None, '')
 
@@ -545,11 +567,11 @@ def request_doi_status(self, code):
 
 
 @app.task(bind=True, max_retries=1)
+@log_call
 def registry_dispatcher_document(self, code, collection):
     """
     This task receive a list of codes that should be queued for DOI registry
     """
-
     articlemeta = ThriftClient(domain=ARTICLEMETA_THRIFTSERVER)
     document = articlemeta.document(code, collection)
     code = '_'.join([document.collection_acronym, document.publisher_id])
@@ -566,7 +588,6 @@ def registry_dispatcher_document(self, code, collection):
 
     exc_class = None
 
-    logger.info('Setting up deposit metadata for (%s)', document.publisher_id)
     depitem = Deposit(
         code=code,
         pid=document.publisher_id,
@@ -592,15 +613,16 @@ def registry_dispatcher_document(self, code, collection):
         deposit = session.query(Deposit).filter_by(code=code).first()
         if deposit:
             logger.info('deposit already exists. it will be deleted and '
-                        're-created: "%s"', repr(deposit))
+                        're-created: "%s_%s"', collection, code)
             session.delete(deposit)
 
         deposit = session.add(depitem)
+    logger.info('deposit successfuly created for "%s_%s": %s', collection, code,
+            repr(deposit))
 
     if exc_class:
         raise exc_class()
 
-    logger.info('Queuing deposit tasks for (%s)', document.publisher_id)
     chain(
         triage_deposit.s(code).set(queue='dispatcher'),
         load_xml_from_articlemeta.s().set(queue='dispatcher'),
@@ -608,7 +630,6 @@ def registry_dispatcher_document(self, code, collection):
         register_doi.s().set(queue='dispatcher'),
         request_doi_status.s().set(queue='releaser')
     ).delay()
-    logger.info('Deposit tasks queued for (%s)', document.publisher_id)
 
 
 @app.task(bind=True, max_retries=1)
@@ -616,5 +637,5 @@ def registry_dispatcher(self, pids_list):
 
     for item in pids_list:
         collection, code = item.split('_')
-
         registry_dispatcher_document.delay(code, collection)
+        logger.info('enqueued deposit for "%s"', item)
