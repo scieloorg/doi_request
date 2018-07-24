@@ -1,5 +1,4 @@
 import os
-import time
 from io import BytesIO
 import pickle
 from datetime import datetime
@@ -44,9 +43,6 @@ class UnkownSubmission(CrossrefExceptions):
 class ChainAborted(Exception):
     pass
 
-
-class SubmissionAlreadyInAnotherThread(ChainAborted):
-    pass
 
 REQUEST_DOI_MAX_RETRY = int(os.environ.get('REQUEST_DOI_MAX_RETRY', '20000'))
 REGISTER_DOI_MAX_RETRY = int(os.environ.get('REGISTER_DOI_MAX_RETRY', '20000'))
@@ -140,7 +136,12 @@ def triage_deposit(self, code):
     return code
 
 
-@app.task(bind=True, default_retry_delay=60, max_retries=100)
+def log_event(session, data):
+    log = LogEvent(**data)
+    session.add(log)
+
+
+@app.task(bind=True, max_retries=100)
 @log_call
 def load_xml_from_articlemeta(self, code):
     articlemeta = ThriftClient(domain=ARTICLEMETA_THRIFTSERVER)
@@ -150,47 +151,34 @@ def load_xml_from_articlemeta(self, code):
     with transactional_session() as session:
         deposit = session.query(Deposit).filter_by(code=code).first()
 
+        log_title = 'Loading XML document from ArticleMeta (%s)' % code
+        log_event(session, {'title': log_title, 'type': 'submission', 'status': 'info', 'deposit_code': code})
+
         try:
-            log_title = 'Loading XML document from ArticleMeta (%s)' % code
-            logevent = LogEvent()
-            logevent.title = log_title
-            logevent.type = 'submission'
-            logevent.status = 'info'
-            logevent.deposit_code = code
-            session.add(logevent)
             xml = articlemeta.document(
                 deposit.pid, deposit.collection_acronym, fmt='xmlcrossref'
             )
         except Exception as exc:
+            logger.info('could not fetch Crossref XML for "%s": %s', code, str(exc))
             logger.exception(exc)
-            now = datetime.now()
-            log_title = 'Fail to load XML document from ArticleMeta (%s)' % code
-            logger.error(log_title)
+
             deposit.submission_status = 'error'
             deposit.submission_updated_at = datetime.now()
             deposit.updated_at = datetime.now()
-            logevent = LogEvent()
-            logevent.title = log_title
-            logevent.body = str(exc)
-            logevent.type = 'submission'
-            logevent.status = 'error'
-            logevent.deposit_code = code
-            session.add(logevent)
+
+            log_title = 'Fail to load XML document from ArticleMeta (%s)' % code
+            log_event(session, {'title': log_title, 'body': str(exc), 'type': 'submission', 'status': 'error', 'deposit_code': code})
 
             exc_log_title = log_title
 
         else:
-            log_title = 'XML Document loaded from ArticleMeta (%s)' % code
             deposit.submission_status = 'waiting'
             deposit.submission_xml = xml
             deposit.submission_updated_at = datetime.now()
             deposit.updated_at = datetime.now()
-            logevent = LogEvent()
-            logevent.title = log_title
-            logevent.type = 'submission'
-            logevent.status = 'success'
-            logevent.deposit_code = code
-            session.add(logevent)
+
+            log_title = 'XML Document loaded from ArticleMeta (%s)' % code
+            log_event(session, {'title': log_title, 'type': 'submission', 'status': 'success', 'deposit_code': code})
 
     if exc_log_title:
         raise self.retry(exc=ComunicationError(exc_log_title))
@@ -198,7 +186,8 @@ def load_xml_from_articlemeta(self, code):
     return code
 
 
-@app.task(bind=True, default_retry_delay=60, max_retries=2000)
+@app.task(bind=True, default_retry_delay=60, max_retries=2000, 
+        throws=(ChainAborted,))
 @log_call
 def prepare_document(self, code):
     with transactional_session() as session:
@@ -333,7 +322,8 @@ def prepare_document(self, code):
     raise ChainAborted(log_title)
 
 
-@app.task(bind=True, default_retry_delay=REGISTER_DOI_DELAY_RETRY, max_retries=REGISTER_DOI_MAX_RETRY)
+@app.task(bind=True, default_retry_delay=REGISTER_DOI_DELAY_RETRY, 
+        max_retries=REGISTER_DOI_MAX_RETRY, throws=(ChainAborted,))
 @log_call
 def register_doi(self, code):
     should_abort_chain, exc_class, exc_log_title = (False, None, '')
