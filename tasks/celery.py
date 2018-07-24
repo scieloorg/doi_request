@@ -90,6 +90,11 @@ def log_call(f):
     return _f 
 
 
+def log_event(session, data):
+    log = LogEvent(**data)
+    session.add(log)
+
+
 @app.task(bind=True, max_retries=1)
 @log_call
 def triage_deposit(self, code):
@@ -102,43 +107,30 @@ def triage_deposit(self, code):
             logger.info('cannot get DOI from deposit "%s" of code "%s"',
                     repr(deposit), code)
             now = datetime.now()
-            log_title = 'DOI number not defined for this document'
             deposit.submission_status = 'error'
             deposit.submission_updated_at = now
             deposit.updated_at = now
-            logevent = LogEvent()
-            logevent.title = log_title
-            logevent.type = 'submission'
-            logevent.status = 'error'
-            logevent.deposit_code = code
-            session.add(logevent)
+
+            log_title = 'DOI number not defined for this document'
+            log_event(session, {'title': log_title, 'type': 'submission', 'status': 'error', 'deposit_code': code})
 
         elif deposit.prefix.lower() != CROSSREF_PREFIX.lower():
             logger.info('cannot proceed to deposit: prefix mismatching',
                     repr(deposit), code)
             now = datetime.now()
-            log_title = 'DOI prefix of this document (%s) do no match with the collection prefix (%s)' % (deposit.prefix, CROSSREF_PREFIX)
             deposit.submission_status = 'notapplicable'
             deposit.feedback_status = 'notapplicable'
             deposit.submission_updated_at = now
             deposit.feedback_updated_at = now
             deposit.updated_at = now
-            logevent = LogEvent()
-            logevent.title = log_title
-            logevent.type = 'general'
-            logevent.status = 'notapplicable'
-            logevent.deposit_code = code
-            session.add(logevent)
+
+            log_title = 'DOI prefix of this document (%s) do no match with the collection prefix (%s)' % (deposit.prefix, CROSSREF_PREFIX)
+            log_event(session, {'title': log_title, 'type': 'general', 'status': 'notapplicable', 'deposit_code': code})
 
     if log_title:
         raise ChainAborted(log_title)
 
     return code
-
-
-def log_event(session, data):
-    log = LogEvent(**data)
-    session.add(log)
 
 
 @app.task(bind=True, max_retries=100)
@@ -248,12 +240,8 @@ def prepare_document(self, code):
             deposit.submission_updated_at = now
             deposit.doi_batch_id = parsed_xml.find(
                 '//{http://www.crossref.org/schema/4.4.0}doi_batch_id').text
-            logevent = LogEvent()
-            logevent.title = log_title
-            logevent.type = 'submission'
-            logevent.status = 'success'
-            logevent.deposit_code = code
-            session.add(logevent)
+
+            log_event(session, {'title': log_title, 'type': 'submission', 'status': 'success', 'deposit_code': code})
             return code
 
         log_title = 'XML with references is invalid, fail to parse xml for document (%s)' % code
@@ -263,23 +251,14 @@ def prepare_document(self, code):
         deposit.submission_status = 'error'
         deposit.submission_updated_at = now
         deposit.updated_at = now
-        logevent = LogEvent()
-        logevent.title = log_title
-        logevent.body = exc
-        logevent.type = 'submission'
-        logevent.status = 'error'
-        logevent.deposit_code = code
-        session.add(logevent)
+
+        log_event(session, {'title': log_title, 'body': str(exc), 'type': 'submission', 'status': 'error', 'deposit_code': code})
 
         log_title = 'Trying to send XML without references'
         now = datetime.now()
         logger.debug(log_title)
-        logevent = LogEvent()
-        logevent.title = log_title
-        logevent.type = 'submission'
-        logevent.status = 'info'
-        logevent.deposit_code = code
-        session.add(logevent)
+
+        log_event(session, {'title': log_title, 'type': 'submission', 'status': 'info', 'deposit_code': code})
 
         is_valid, parsed_xml, exc = xml_is_valid(
             deposit.submission_xml, only_front=True
@@ -295,12 +274,8 @@ def prepare_document(self, code):
             deposit.submission_updated_at = now
             deposit.doi_batch_id = parsed_xml.find(
                 '//{http://www.crossref.org/schema/4.4.0}doi_batch_id').text
-            logevent = LogEvent()
-            logevent.title = log_title
-            logevent.type = 'submission'
-            logevent.status = 'success'
-            logevent.deposit_code = code
-            session.add(logevent)
+
+            log_event(session, {'title': log_title, 'type': 'submission', 'status': 'success', 'deposit_code': code})
 
             return code
 
@@ -311,13 +286,8 @@ def prepare_document(self, code):
         deposit.submission_status = 'error'
         deposit.submission_updated_at = now
         deposit.updated_at = now
-        logevent = LogEvent()
-        logevent.title = log_title
-        logevent.body = exc
-        logevent.type = 'submission'
-        logevent.status = 'error'
-        logevent.deposit_code = code
-        session.add(logevent)
+
+        log_event(session, {'title': log_title, 'body': str(exc), 'type': 'submission', 'status': 'error', 'deposit_code': code})
 
     raise ChainAborted(log_title)
 
@@ -331,32 +301,23 @@ def register_doi(self, code):
     with transactional_session() as session:
         deposit = session.query(Deposit).filter_by(code=code).first()
 
+        log_title = 'Sending XML to Crossref'
+        log_event(session, {'title': log_title, 'type': 'submission', 'status': 'info', 'deposit_code': code})
+
         try:
-            log_title = 'Sending XML to Crossref'
-            logevent = LogEvent()
-            logevent.title = log_title
-            logevent.type = 'submission'
-            logevent.status = 'info'
-            logevent.deposit_code = code
-            session.add(logevent)
             result = crossref_client.register_doi(code, deposit.submission_xml)
         except Exception as exc:
             log_title = 'Fail to Connect to Crossref API, retrying at (%s) to submit (%s)' % (
                 datetime.now()+REGISTER_DOI_DELAY_RETRY_TD, code
             )
             logger.error(log_title)
+
             now = datetime.now()
             deposit.submission_status = 'waiting'
             deposit.submission_updated_at = now
             deposit.updated_at = now
-            logevent = LogEvent()
-            logevent.title = log_title
-            logevent.body = str(exc)
-            logevent.type = 'submission'
-            logevent.status = 'error'
-            logevent.deposit_code = code
-            session.add(logevent)
 
+            log_event(session, {'title': log_title, 'body': str(exc), 'type': 'submission', 'status': 'error', 'deposit_code': code})
             exc_class, exc_log_title = (ComunicationError, log_title)
         else:
 
@@ -370,14 +331,8 @@ def register_doi(self, code):
                 deposit.submission_status = 'waiting'
                 deposit.submission_updated_at = now
                 deposit.updated_at = now
-                logevent = LogEvent()
-                logevent.title = log_title
-                logevent.body = str('HTTP status code %d' % result.status_code)
-                logevent.type = 'submission'
-                logevent.status = 'error'
-                logevent.deposit_code = code
-                session.add(logevent)
 
+                log_event(session, {'title': log_title, 'body': 'HTTP status code %d' % result.status_code, 'type': 'submission', 'status': 'error', 'deposit_code': code})
                 exc_class, exc_log_title = (RequestError, log_title)
 
             elif result.status_code == 200 and 'SUCCESS' in result.text:
@@ -387,13 +342,8 @@ def register_doi(self, code):
                 deposit.submission_status = 'success'
                 deposit.submission_updated_at = now
                 deposit.updated_at = now
-                logevent = LogEvent()
-                logevent.title = log_title
-                logevent.body = result.text
-                logevent.type = 'submission'
-                logevent.status = 'success'
-                logevent.deposit_code = code
-                session.add(logevent)
+
+                log_event(session, {'title': log_title, 'body': result.text, 'type': 'submission', 'status': 'success', 'deposit_code': code})
                 return code
 
             else:
@@ -402,14 +352,8 @@ def register_doi(self, code):
                 deposit.submission_status = 'error'
                 deposit.submission_updated_at = now
                 deposit.updated_at = now
-                logevent = LogEvent()
-                logevent.title = log_title
-                logevent.body = result.text
-                logevent.type = 'submission'
-                logevent.status = 'error'
-                logevent.deposit_code = code
-                session.add(logevent)
 
+                log_event(session, {'title': log_title, 'body': result.text, 'type': 'submission', 'status': 'error', 'deposit_code': code})
                 should_abort_chain, exc_log_title = (True, log_title)
 
     if should_abort_chain:
@@ -434,12 +378,8 @@ class CallbackTask(Task):
             deposit.feedback_status = 'error'
             deposit.feedback_updated_at = now
             deposit.updated_at = now
-            logevent = LogEvent()
-            logevent.title = log_title
-            logevent.type = 'feedback'
-            logevent.status = 'error'
-            logevent.deposit_code = code
-            session.add(logevent)
+
+            log_event(session, {'title': log_title, 'type': 'feedback', 'status': 'error', 'deposit_code': code})
 
 
 @app.task(base=CallbackTask, bind=True, default_retry_delay=REQUEST_DOI_DELAY_RETRY, max_retries=REQUEST_DOI_MAX_RETRY)
@@ -455,12 +395,8 @@ def request_doi_status(self, code):
         deposit.feedback_status = 'waiting'
         deposit.feedback_updated_at = now
         deposit.updated_at = now
-        logevent = LogEvent()
-        logevent.title = log_title
-        logevent.type = 'feedback'
-        logevent.status = 'info'
-        logevent.deposit_code = code
-        session.add(logevent)
+
+        log_event(session, {'title': log_title, 'type': 'feedback', 'status': 'info', 'deposit_code': code})
 
         try:
             result = crossref_client.request_doi_status_by_batch_id(deposit.doi_batch_id)
@@ -473,14 +409,8 @@ def request_doi_status(self, code):
             deposit.feedback_status = 'waiting'
             deposit.feedback_updated_at = now
             deposit.updated_at = now
-            logevent = LogEvent()
-            logevent.title = log_title
-            logevent.body = str(exc)
-            logevent.type = 'feedback'
-            logevent.status = 'error'
-            logevent.deposit_code = code
-            session.add(logevent)
 
+            log_event(session, {'title': log_title, 'body': str(exc), 'type': 'feedback', 'status': 'error', 'deposit_code': code})
             exc_class, exc_log_title = (ComunicationError, log_title)
 
         else:
@@ -497,14 +427,8 @@ def request_doi_status(self, code):
                 deposit.feedback_status = 'waiting'
                 deposit.feedback_updated_at = now
                 deposit.updated_at = now
-                logevent = LogEvent()
-                logevent.title = log_title
-                logevent.body = str('HTTP status code %d' % result.status_code)
-                logevent.type = 'feedback'
-                logevent.status = 'error'
-                logevent.deposit_code = code
-                session.add(logevent)
 
+                log_event(session, {'title': log_title, 'body': 'HTTP status code %d' % result.status_code, 'type': 'feedback', 'status': 'error', 'deposit_code': code})
                 exc_class, exc_log_title = (RequestError, log_title)
 
             elif doi_batch_status != 'completed':
@@ -514,13 +438,8 @@ def request_doi_status(self, code):
                 deposit.feedback_status = 'waiting'
                 deposit.feedback_updated_at = now
                 deposit.updated_at = now
-                logevent = LogEvent()
-                logevent.title = log_title
-                logevent.type = 'feedback'
-                logevent.status = 'info'
-                logevent.deposit_code = code
-                session.add(logevent)
 
+                log_event(session, {'title': log_title, 'type': 'feedback', 'status': 'info', 'deposit_code': code})
                 exc_class, exc_log_title = (UnkownSubmission, log_title)
 
             else:
@@ -533,13 +452,8 @@ def request_doi_status(self, code):
                 deposit.feedback_xml = etree.tostring(xml_doc).decode('utf-8')
                 deposit.updated_at = now
                 deposit.feedback_updated_at = now
-                logevent = LogEvent()
-                logevent.title = log_title
-                logevent.body = feedback_body
-                logevent.type = 'feedback'
-                logevent.status = feedback_status
-                logevent.deposit_code = code
-                session.add(logevent)
+
+                log_event(session, {'title': log_title, 'body': feedback_body, 'type': 'feedback', 'status': feedback_status, 'deposit_code': code})
 
                 if feedback_status == 'success' and 'added' in feedback_body.lower():
                     #crossref backfiles limit current year - 2.
