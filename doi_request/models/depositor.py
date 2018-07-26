@@ -33,6 +33,10 @@ class Deposit(Base):
     feedback_updated_at = Column('feedback_updated_at', DateTime(timezone=True))
     log_events = relationship('LogEvent', back_populates='deposit', cascade="all, delete, delete-orphan")
 
+    def __repr__(self):
+        return 'Deposit(code="%s", pid="%s", doi="%s")' % (self.code, self.pid,
+                self.doi)
+
     @property
     def timeline(self):
         return sorted(self.log_events, key=lambda event: event.date)
