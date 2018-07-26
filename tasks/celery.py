@@ -124,7 +124,7 @@ def triage_deposit(self, code):
             deposit.feedback_updated_at = now
             deposit.updated_at = now
 
-            log_title = 'DOI prefix of this document (%s) do no match with the collection prefix (%s)' % (deposit.prefix, CROSSREF_PREFIX)
+            log_title = 'DOI prefix for this document (%s) does not match with the collection\'s (%s)' % (deposit.prefix, CROSSREF_PREFIX)
             log_event(session, {'title': log_title, 'type': 'general', 'status': 'notapplicable', 'deposit_code': code})
 
     if log_title:
@@ -536,10 +536,9 @@ def registry_dispatcher_document(self, code, collection):
     ).delay()
 
 
-@app.task(bind=True, max_retries=1)
+@app.task(bind=True)
 def registry_dispatcher(self, pids_list):
-
     for item in pids_list:
         collection, code = item.split('_')
-        registry_dispatcher_document.delay(code, collection)
+        registry_dispatcher_document.delay(code, collection, queue='inputbuff')
         logger.info('enqueued deposit for "%s"', item)
