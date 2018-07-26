@@ -35,13 +35,14 @@ keys = console
 keys = generic
 
 [logger_root]
-level = WARN
+level = ERROR
 handlers = console
 
 [logger_doi_request]
-level = WARN
-handlers =
+level = INFO
+handlers = console
 qualname = doi_request
+propagate = 0
 
 [handler_console]
 class = StreamHandler
