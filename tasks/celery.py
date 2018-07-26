@@ -104,7 +104,7 @@ def triage_deposit(self, code):
 
         if not deposit.doi:
             logger.info('cannot get DOI from deposit "%s" of code "%s"',
-                    repr(deposit), code)
+                    deposit.id, code)
             now = datetime.now()
             deposit.submission_status = 'error'
             deposit.submission_updated_at = now
@@ -114,8 +114,6 @@ def triage_deposit(self, code):
             log_event(session, {'title': log_title, 'type': 'submission', 'status': 'error', 'deposit_code': code})
 
         elif deposit.prefix.lower() != CROSSREF_PREFIX.lower():
-            logger.info('cannot proceed to deposit: prefix mismatching',
-                    repr(deposit), code)
             now = datetime.now()
             deposit.submission_status = 'notapplicable'
             deposit.feedback_status = 'notapplicable'
@@ -496,8 +494,6 @@ def registry_dispatcher_document(self, code, collection):
         doi_prefix = CROSSREF_PREFIX
         doi = '/'.join([CROSSREF_PREFIX, document.publisher_ahead_id or document.publisher_id])
 
-    exc_class = None
-
     depitem = Deposit(
         code=code,
         pid=document.publisher_id,
@@ -523,15 +519,12 @@ def registry_dispatcher_document(self, code, collection):
         deposit = session.query(Deposit).filter_by(code=code).first()
         if deposit:
             logger.info('deposit already exists. it will be deleted and '
-                        're-created: "%s_%s"', collection, code)
+                        're-created: "%s"', code)
             session.delete(deposit)
 
-        deposit = session.add(depitem)
-    logger.info('deposit successfuly created for "%s_%s": %s', collection, code,
+        session.add(depitem)
+    logger.info('deposit successfuly created for "%s": %s', code,
             repr(deposit))
-
-    if exc_class:
-        raise exc_class()
 
     chain(
         triage_deposit.s(code).set(queue='dispatcher'),
