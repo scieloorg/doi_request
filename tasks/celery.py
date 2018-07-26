@@ -1,6 +1,5 @@
 import os
 from io import BytesIO
-import pickle
 from datetime import datetime
 from datetime import timedelta
 import functools
@@ -8,9 +7,8 @@ import functools
 from celery import Celery
 from celery import Task, chain
 from celery.utils.log import get_task_logger
-from celery.contrib import rdb
 from lxml import etree
-from articlemeta.client import ThriftClient
+from articlemeta.client import ThriftClient, ServerError
 
 from crossref.client import CrossrefClient
 from doi_request.models.depositor import Deposit, LogEvent, Expenses
@@ -22,6 +20,7 @@ logger = get_task_logger(__name__)
 
 # Celery Config
 app = Celery('tasks', broker='amqp://guest@rabbitmq//')
+
 
 
 class CrossrefExceptions(Exception):
@@ -95,7 +94,7 @@ def log_event(session, data):
     session.add(log)
 
 
-@app.task(bind=True, max_retries=1)
+@app.task(bind=True, throws=(ChainAborted,))
 @log_call
 def triage_deposit(self, code):
     log_title = ''
@@ -128,12 +127,13 @@ def triage_deposit(self, code):
             log_event(session, {'title': log_title, 'type': 'general', 'status': 'notapplicable', 'deposit_code': code})
 
     if log_title:
-        raise ChainAborted(log_title)
+        raise ChainAborted(log_title + ': ' + code)
 
     return code
 
 
-@app.task(bind=True, max_retries=100)
+@app.task(bind=True, max_retries=10, task_time_limit=60,
+        autoretry_for=(ServerError,), retry_backoff=True)
 @log_call
 def load_xml_from_articlemeta(self, code):
     articlemeta = ThriftClient(domain=ARTICLEMETA_THRIFTSERVER)
@@ -178,10 +178,14 @@ def load_xml_from_articlemeta(self, code):
     return code
 
 
-@app.task(bind=True, default_retry_delay=60, max_retries=2000, 
-        throws=(ChainAborted,))
+@app.task(bind=True, throws=(ChainAborted,))
 @log_call
 def prepare_document(self, code):
+    """Modifica o XML que será enviado para o Crossref com dados do depositante.
+
+    Os únicos tipos de erros passíveis de novas tentativas são os de comunicação
+    com o banco de dados.
+    """
     with transactional_session() as session:
         deposit = session.query(Deposit).filter_by(code=code).first()
 
@@ -470,7 +474,8 @@ def request_doi_status(self, code):
         raise self.retry(exc=exc_class(exc_log_title))
 
 
-@app.task(bind=True, max_retries=1)
+@app.task(bind=True, throws=(ChainAborted,), task_time_limit=60, 
+        autoretry_for=(ServerError,), retry_backoff=True)
 @log_call
 def registry_dispatcher_document(self, code, collection):
     """
@@ -478,6 +483,7 @@ def registry_dispatcher_document(self, code, collection):
     """
     articlemeta = ThriftClient(domain=ARTICLEMETA_THRIFTSERVER)
     document = articlemeta.document(code, collection)
+
     code = '_'.join([document.collection_acronym, document.publisher_id])
     log_title = 'Reading document: %s' % code
     logger.info(log_title)
