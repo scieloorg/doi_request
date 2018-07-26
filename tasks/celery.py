@@ -541,10 +541,3 @@ def registry_dispatcher_document(self, code, collection):
         request_doi_status.s().set(queue='releaser')
     ).delay()
 
-
-@app.task(bind=True)
-def registry_dispatcher(self, pids_list):
-    for item in pids_list:
-        collection, code = item.split('_')
-        registry_dispatcher_document.delay(code, collection, queue='inputbuff')
-        logger.info('enqueued deposit for "%s"', item)
