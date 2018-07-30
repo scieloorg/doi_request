@@ -8,17 +8,17 @@ with open(os.path.join(here, 'README.rst')) as f:
     README = f.read()
 
 install_requires = [
-    'requests==2.19.1',
+    'requests',
     'pyramid',
     'pyramid_mako',
     'waitress',
-    'articlemetaapi>=1.24.0',
+    'articlemetaapi',
     'lxml',
-    'celery',
+    'celery[redis]',
     'SQLAlchemy',
     'psycopg2',
     'zope.sqlalchemy',
-    'alembic'
+    'alembic',
 ]
 
 tests_require = [
