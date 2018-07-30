@@ -19,7 +19,7 @@ from utils.settings import asbool
 logger = get_task_logger(__name__)
 
 # Celery Config
-app = Celery('tasks', broker='amqp://guest@rabbitmq//')
+app = Celery('tasks', broker='redis://redis:6379/0')
 
 
 

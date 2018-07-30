@@ -43,7 +43,7 @@ services:
     command: ["celery", "-A", "tasks.celery", "worker", "-l", "INFO"]
     depends_on:
     - db
-    - rabbitmq
+    - redis
     - dashboard
   exportdoi:
     build: .
@@ -82,8 +82,8 @@ services:
     command: ["celery", "-A", "tasks.celery", "worker", "-l", "INFO", "-Q", "dispatcher"]
     depends_on:
     - celeryworker
-  rabbitmq:
-    image: rabbitmq
+  redis:
+    image: redis
     networks:
     - appnetwork
   celeryworker-releaser:

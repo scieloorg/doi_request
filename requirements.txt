@@ -23,3 +23,4 @@ xylose==1.33.1
 zope.interface==4.5.0
 zope.sqlalchemy==1.0
 raven==6.9.0
+redis==2.10.6
