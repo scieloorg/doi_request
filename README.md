@@ -2,6 +2,9 @@
 
 É uma ferramenta desenvolvida para automatizar os registros de DOI pelas coleções que adotam a métodologia SciELO. Por meio do DOI Manager é possível gerenciar novos depósitos, re-depositar, contabilizar custos e buscar informações sobre sucesso e falha de depósitos passados.
 
+## Documentação
+
+Para mais informações sobre a ferramenta acesse o [índice da documentação](docs/README.md).
 
 ## Métodos de instalação
 
