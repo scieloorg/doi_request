@@ -47,7 +47,7 @@ class ExportDOI(object):
 
                 code = '_'.join([document.collection, document.code])
                 logger.info('collecting document for deposit: %s', code)
-                self._depositor.deposit_by_pids([code])
+                self._depositor.deposit_by_pids([code], skip_deposited=True)
                 count += 1
 
         logger.info('finished collecting documents. total: %d', count)

@@ -479,6 +479,23 @@ def registry_dispatcher_document(self, code, collection):
     """
     This task receive a list of codes that should be queued for DOI registry
     """
+    return _registry_dispatcher_document(code, collection, skip_deposited=False)
+
+
+@app.task(bind=True, throws=(ChainAborted,), task_time_limit=60, 
+        autoretry_for=(ServerError,), retry_backoff=True)
+@log_call
+def registry_dispatcher_document_skip_deposited(self, code, collection):
+    """
+    This task receive a list of codes that should be queued for DOI registry
+    """
+    return _registry_dispatcher_document(code, collection, skip_deposited=True)
+
+
+def _registry_dispatcher_document(code, collection, skip_deposited):
+    """
+    This task receive a list of codes that should be queued for DOI registry
+    """
     articlemeta = ThriftClient(domain=ARTICLEMETA_THRIFTSERVER)
     document = articlemeta.document(code, collection)
 
@@ -518,11 +535,16 @@ def registry_dispatcher_document(self, code, collection):
     with transactional_session() as session:
         deposit = session.query(Deposit).filter_by(code=code).first()
         if deposit:
-            logger.info('deposit already exists. it will be deleted and '
-                        're-created: "%s"', code)
-            session.delete(deposit)
-
+            if skip_deposited:
+                logger.info('deposit already exists. skipping: "%s"', code)
+                return
+            else:
+                logger.info('deposit already exists. it will be deleted and '
+                            're-created: "%s"', code)
+                session.delete(deposit)
+        
         session.add(depitem)
+
     logger.info('deposit successfuly created for "%s": %s', code,
             repr(deposit))
 
