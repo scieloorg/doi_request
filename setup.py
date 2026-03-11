@@ -11,7 +11,7 @@ install_requires = [
     'articlemetaapi>=1.26.5',
     'celery[redis]>=5.4,<6',
     'lxml>=5.3,<6',
-    'pyramid>=2,<3',
+    'pyramid==2.0.2',
     'pyramid-mako>=1.1.0,<2',
     'psycopg[binary]>=3.2,<4',
     'requests>=2.32,<3',

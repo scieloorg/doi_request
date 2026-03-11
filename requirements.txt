@@ -9,7 +9,7 @@ PasteDeploy>=3,<4
 plaster>=1.1,<2
 plaster-pastedeploy>=1.0,<2
 psycopg[binary]>=3.2,<4
-pyramid>=2,<3
+pyramid==2.0.2
 pyramid-mako>=1.1.0,<2
 python-dateutil>=2.9,<3
 python-editor>=1.0.4,<2
