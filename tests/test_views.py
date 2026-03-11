@@ -32,7 +32,7 @@ class DepositSearchTest(unittest.TestCase):
                 xml_file_name='S1518-29242026000101002.xml',
                 prefix='10.1590',
                 doi='10.1590/S1518-29242026000101002',
-                submission_status='registered',
+                submission_status='waiting',
                 feedback_status='success',
                 started_at=started_at,
                 updated_at=started_at,
@@ -51,8 +51,8 @@ class DepositSearchTest(unittest.TestCase):
                 xml_file_name='S0102-311X2026000100001.xml',
                 prefix='10.1590',
                 doi='10.1590/S0102-311X2026000100001',
-                submission_status='submitted',
-                feedback_status='queued',
+                submission_status='failure',
+                feedback_status='error',
                 started_at=started_at,
                 updated_at=started_at,
             ),
@@ -70,8 +70,27 @@ class DepositSearchTest(unittest.TestCase):
                 xml_file_name='S0103-40142026000100002.xml',
                 prefix='10.1590',
                 doi='10.1590/S0103-40142026000100002',
-                submission_status='done',
-                feedback_status='error',
+                submission_status='notapplicable',
+                feedback_status='waiting',
+                started_at=started_at,
+                updated_at=started_at,
+            ),
+            Deposit(
+                code='scl_S0104-59702026000100003',
+                pid='S0104-59702026000100003',
+                issn='0104-5970',
+                volume='5',
+                number='1',
+                issue_label='v5n1',
+                journal='Historia Ciencias Saude',
+                journal_acronym='hcs',
+                collection_acronym='scl',
+                publication_year=2026,
+                xml_file_name='S0104-59702026000100003.xml',
+                prefix='10.1590',
+                doi='10.1590/S0104-59702026000100003',
+                submission_status='error',
+                feedback_status='failure',
                 started_at=started_at,
                 updated_at=started_at,
             ),
@@ -96,13 +115,59 @@ class DepositSearchTest(unittest.TestCase):
     def test_search_deposits_matches_other_text_fields(self):
         query, _ = search_deposits(
             self.session.query(Deposit),
-            'saude',
+            'publica',
         )
 
         self.assertEqual(
             [item.journal_acronym for item in query.all()],
             ['csp'],
         )
+
+    def test_search_deposits_matches_submission_status(self):
+        query, _ = search_deposits(
+            self.session.query(Deposit),
+            'waiti',
+        )
+
+        self.assertIn(
+            'waiting',
+            [item.submission_status for item in query.all()],
+        )
+
+    def test_search_deposits_matches_feedback_status(self):
+        query, _ = search_deposits(
+            self.session.query(Deposit),
+            'succ',
+        )
+
+        self.assertEqual(
+            [item.feedback_status for item in query.all()],
+            ['success'],
+        )
+
+    def test_search_deposits_matches_status_variants(self):
+        search_cases = {
+            'fail': {'failure'},
+            'notapp': {'notapplicable'},
+            'err': {'error'},
+        }
+
+        for term, expected_statuses in search_cases.items():
+            query, _ = search_deposits(
+                self.session.query(Deposit),
+                term,
+            )
+
+            result_statuses = {
+                item.submission_status for item in query.all()
+            } | {
+                item.feedback_status for item in query.all()
+            }
+
+            self.assertTrue(
+                expected_statuses.issubset(result_statuses),
+                msg='term %s did not match expected statuses' % term,
+            )
 
     def test_search_deposits_ignores_blank_input(self):
         query, search_term = search_deposits(
@@ -111,7 +176,7 @@ class DepositSearchTest(unittest.TestCase):
         )
 
         self.assertEqual(search_term, '')
-        self.assertEqual(query.count(), 3)
+        self.assertEqual(query.count(), 4)
 
     def test_apply_deposit_sort_orders_by_submission_status(self):
         query, sort_key = apply_deposit_sort(
@@ -122,7 +187,7 @@ class DepositSearchTest(unittest.TestCase):
         self.assertEqual(sort_key, 'submission_status_asc')
         self.assertEqual(
             [item.submission_status for item in query.all()],
-            ['done', 'registered', 'submitted'],
+            ['error', 'failure', 'notapplicable', 'waiting'],
         )
 
     def test_apply_deposit_sort_orders_by_feedback_status_desc(self):
@@ -134,5 +199,5 @@ class DepositSearchTest(unittest.TestCase):
         self.assertEqual(sort_key, 'feedback_status_desc')
         self.assertEqual(
             [item.feedback_status for item in query.all()],
-            ['success', 'queued', 'error'],
+            ['waiting', 'success', 'failure', 'error'],
         )

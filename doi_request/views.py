@@ -38,6 +38,8 @@ SEARCHABLE_DEPOSIT_FIELDS = (
     Deposit.number,
     Deposit.issue_label,
     Deposit.xml_file_name,
+    Deposit.submission_status,
+    Deposit.feedback_status,
 )
 
 
