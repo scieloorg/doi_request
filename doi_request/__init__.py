@@ -1,4 +1,12 @@
 import os
+import warnings
+
+warnings.filterwarnings(
+    "ignore",
+    message=r"pkg_resources is deprecated as an API\..*",
+    category=UserWarning,
+    module=r"pyramid\.path",
+)
 
 VERSION = '1.5.0'
 

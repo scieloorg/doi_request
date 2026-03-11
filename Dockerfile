@@ -27,5 +27,6 @@ RUN apk add --no-cache --virtual .build-deps \
 WORKDIR /app
 
 ENV PYTHONUNBUFFERED 1
+ENV PYTHONWARNINGS "ignore:pkg_resources is deprecated as an API.:UserWarning"
 
 USER nobody
