@@ -1,3 +1,6 @@
-include *.txt *.ini *.cfg *.rst
-recursive-include doi_request *.ico *.png *.css *.gif *.jpg *.pt *.txt *.mak *.mako *.js *.html *.xml *.jinja2 *.pot *.po *.mo
-recursive-include xsd *.xsd
+include README.md
+include setup.cfg
+graft doi_request/locale
+graft doi_request/static
+graft doi_request/templates
+graft xsd

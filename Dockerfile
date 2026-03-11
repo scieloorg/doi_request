@@ -1,13 +1,12 @@
-FROM python:3.5.2-alpine AS build
+FROM python:3.14.3-alpine AS build
 COPY . /src
 RUN pip install --upgrade pip \
-    && pip install wheel
+    && pip install build wheel
 RUN cd /src \
-    && python setup.py bdist_wheel -d /deps
+    && python -m build --wheel --outdir /deps
 
 
-FROM python:3.5.2-alpine
-MAINTAINER gustavo.fonseca@scielo.org
+FROM python:3.14.3-alpine
 
 COPY --from=build /deps/* /deps/
 COPY production.ini-TEMPLATE /app/config.ini
@@ -30,4 +29,3 @@ WORKDIR /app
 ENV PYTHONUNBUFFERED 1
 
 USER nobody
-

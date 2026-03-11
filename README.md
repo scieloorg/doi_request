@@ -24,14 +24,14 @@ As seguintes variáveis devem ser configuradas:
 - `CROSSREF_DEPOSITOR_EMAIL` - E-mail utilizado pelo depositor do DOI no Crossref;
 - `CROSSREF_DEPOSITOR_NAME` - Nome utilizado pelo depositor do DOI no Crossref;
 - `CROSSREF_PREFIX` - Prefixo utilizado pelo depositor do DOI no Crossref (ex: a SciELO utiliza o `10.1590`);
-- `SQL_ENGINE` - URI utilizada para conectar ao Banco de dados (PostgreSQL) (ex: `postgresql://usuario:senha@db:5432/banco_de_dados`);
+- `SQL_ENGINE` - URI utilizada para conectar ao Banco de dados (PostgreSQL) (ex: `postgresql+psycopg://usuario:senha@db:5432/banco_de_dados`);
 - `LOGGING_LEVEL` - Nível de log utilizado pela aplicação;
 
 ### Instalação direta
 
 Para realizar uma instalação direta, sem auxílio de containers, deve-se atentar para os seguintes pré requisitos:
 
-- Python **3.5.2**
+- Python **3.14.3**
 - Libxml2 dev
 - PostgreSQL [**9.5**](https://hub.docker.com/r/scieloorg/inbox_postgres)
 - Celery **4.2.1**
@@ -56,7 +56,7 @@ cp alembic.ini-TEMPLATE alembic.ini
 É possível usar o `docker-compose` para facilitar a instalação do ambiente via Docker, utilize o comando:
 
 ```shell
-docker-compose up
+docker compose up
 ```
 
 O build das imagens será realizado e o ambiente deve ser inicialiado de acordo com o processo definido no arquivo `docker-compose.yml`.
