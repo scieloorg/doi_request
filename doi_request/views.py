@@ -10,6 +10,7 @@ import pyramid.httpexceptions as exc
 from sqlalchemy import desc, func, or_, and_, asc
 
 from doi_request.models.depositor import Deposit, Expenses
+from doi_request.auth import require_login
 from doi_request import template_choices
 from doi_request import controller
 from doi_request.control_manager import check_session
@@ -59,6 +60,7 @@ def apply_deposit_sort(query, raw_sort_key):
     return query.order_by(*order_by), sort_key
 
 @view_config(route_name='list_deposits', renderer='templates/deposits.mako')
+@require_login
 @check_session
 @base_data_manager
 def list_deposits(request):
@@ -130,6 +132,7 @@ def list_deposits(request):
     return data
 
 @view_config(route_name='deposit', renderer='templates/deposit.mako')
+@require_login
 @check_session
 @base_data_manager
 def deposit(request):
@@ -151,6 +154,7 @@ def deposit(request):
     return data
 
 @view_config(route_name='deposit_request', renderer='templates/deposit_request.mako')
+@require_login
 @check_session
 @base_data_manager
 def deposit_request(request):
@@ -162,6 +166,7 @@ def deposit_request(request):
     return data
 
 @view_config(route_name='expenses', renderer='templates/expenses.mako')
+@require_login
 @check_session
 @base_data_manager
 def expenses(request):
@@ -199,6 +204,7 @@ def expenses(request):
     return data
 
 @view_config(route_name='expenses_details', renderer='templates/expenses_details.mako')
+@require_login
 @check_session
 @base_data_manager
 def expenses_details(request):
@@ -233,6 +239,7 @@ def expenses_details(request):
     return data
 
 @view_config(route_name='deposit_post')
+@require_login
 @base_data_manager
 def deposit_post(request):
 
@@ -246,6 +253,7 @@ def deposit_post(request):
     return HTTPFound('/')
 
 @view_config(route_name='help', renderer='templates/help.mako')
+@require_login
 @check_session
 @base_data_manager
 def help(request):
@@ -255,6 +263,7 @@ def help(request):
     return data
 
 @view_config(route_name='downloads', renderer='templates/downloads.mako')
+@require_login
 @check_session
 @base_data_manager
 def downloads(request):

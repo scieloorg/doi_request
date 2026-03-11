@@ -30,6 +30,12 @@ def db(request):
     return session
 
 
+def current_user(request):
+    from doi_request.auth import get_authenticated_user
+
+    return get_authenticated_user(request)
+
+
 def main(global_config, **settings):
     """ This function returns a Pyramid WSGI application.
     """
@@ -53,11 +59,14 @@ def main(global_config, **settings):
     initialize_sql(engine)
     config.add_request_method(db, reify=True)
     config.add_request_method(version)
+    config.add_request_method(current_user, reify=True)
 
     config.include('pyramid_mako')
     config.add_static_view('static', 'static', cache_max_age=3600)
     config.add_static_view('media', static_assets, cache_max_age=3600)
     config.add_route('list_deposits', '/')
+    config.add_route('login', '/login')
+    config.add_route('logout', '/logout')
     config.add_route('help', '/help')
     config.add_route('deposit_request', '/deposit/request')
     config.add_route('expenses', '/expenses')
@@ -73,7 +82,8 @@ def main(global_config, **settings):
     config.add_translation_dirs('doi_request:locale')
 
     # Session config
-    navegation_session_factory = SignedCookieSessionFactory('sses_navegation')
+    navigation_session_secret = os.environ.get('SESSION_SECRET', 'sses_navegation')
+    navegation_session_factory = SignedCookieSessionFactory(navigation_session_secret)
     config.set_session_factory(navegation_session_factory)
 
     config.scan()

@@ -77,3 +77,16 @@ class Expenses(Base):
     registry_date = Column('registry_date', DateTime(timezone=True), default=utcnow)
     doi = Column('doi', String(128), index=True)
     cost = Column('cost', Float, nullable=False)
+
+
+class User(Base):
+    __tablename__ = 'user_account'
+    id = Column(Integer, primary_key=True)
+    username = Column('username', String(64), unique=True, nullable=False, index=True)
+    password_hash = Column('password_hash', String(255), nullable=False)
+    is_active = Column('is_active', Boolean, nullable=False, default=True, index=True)
+    created_at = Column('created_at', DateTime(timezone=True), nullable=False, default=utcnow)
+    updated_at = Column('updated_at', DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow)
+
+    def __repr__(self):
+        return 'User(username="%s", is_active=%s)' % (self.username, self.is_active)

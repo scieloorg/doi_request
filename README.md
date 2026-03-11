@@ -26,6 +26,7 @@ As seguintes variáveis devem ser configuradas:
 - `CROSSREF_PREFIX` - Prefixo utilizado pelo depositor do DOI no Crossref (ex: a SciELO utiliza o `10.1590`);
 - `SQL_ENGINE` - URI utilizada para conectar ao Banco de dados (PostgreSQL) (ex: `postgresql+psycopg://usuario:senha@db:5432/banco_de_dados`);
 - `LOGGING_LEVEL` - Nível de log utilizado pela aplicação;
+- `SESSION_SECRET` - Segredo usado para assinar a sessão autenticada da interface web;
 
 ### Instalação direta
 
@@ -60,6 +61,29 @@ docker compose up
 ```
 
 O build das imagens será realizado e o ambiente deve ser inicialiado de acordo com o processo definido no arquivo `docker-compose.yml`.
+
+## Autenticação
+
+O acesso à interface web pode ser protegido por login local da aplicação.
+
+### Rollout em produção
+
+1. Fazer deploy do código novo.
+2. Executar a migration:
+
+```shell
+alembic upgrade head
+```
+
+3. Criar ou atualizar o usuário administrador:
+
+```shell
+doi_request_create_admin --username admin --password 'senha-forte'
+```
+
+4. Reiniciar o serviço web.
+
+Em ambientes Docker, os comandos podem ser executados com `docker compose run --rm ...` usando a imagem da aplicação.
 
 
 ## Métodos de operação

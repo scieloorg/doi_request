@@ -68,7 +68,8 @@ setup(
         ],
         'console_scripts': [
             'processing_export_doi = processing.exportDOI:main',
-            'processing_export_id = processing.export2id:main'
+            'processing_export_id = processing.export2id:main',
+            'doi_request_create_admin = doi_request.auth_cli:main',
         ]
     },
 )

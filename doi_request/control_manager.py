@@ -99,6 +99,7 @@ def base_data_manager(wrapped):
         data['collection_acronym'] = os.environ.get('COLLECTION_ACRONYM', 'não definido')
         data['version'] = request.version()
         data['locale'] = request.session['_LOCALE_']
+        data['current_user'] = request.current_user
 
         setattr(request, 'data_manager', data)
 
