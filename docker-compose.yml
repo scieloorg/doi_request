@@ -1,5 +1,3 @@
-version: '2'
-
 networks:
   appnetwork:
     driver: bridge
@@ -7,119 +5,134 @@ networks:
 services:
   alembic-upgrade:
     build: .
-    image: ${APP_IMAGE}
+    image: ${APP_IMAGE:-doi_request:local}
     environment:
-      ARTICLEMETA_ADMINTOKEN: ${ARTICLEMETA_ADMINTOKEN}
-      ARTICLEMETA_THRIFTSERVER: ${ARTICLEMETA_THRIFTSERVER}
-      COLLECTION_ACRONYM: ${COLLECTION_ACRONYM}
-      CROSSREF_API_PASSWORD: ${CROSSREF_API_PASSWORD}
-      CROSSREF_API_USER: ${CROSSREF_API_USER}
-      CROSSREF_DEPOSITOR_EMAIL: ${CROSSREF_DEPOSITOR_EMAIL}
-      CROSSREF_DEPOSITOR_NAME: ${CROSSREF_DEPOSITOR_NAME}
-      CROSSREF_PREFIX: ${CROSSREF_PREFIX}
-      LOGGING_LEVEL: ${LOGGING_LEVEL}
-      SQL_ENGINE: postgresql://postgres:password@db:5432/doi_manager
+      ARTICLEMETA_ADMINTOKEN: ${ARTICLEMETA_ADMINTOKEN:-}
+      ARTICLEMETA_THRIFTSERVER: ${ARTICLEMETA_THRIFTSERVER:-articlemeta.scielo.org:11621}
+      COLLECTION_ACRONYM: ${COLLECTION_ACRONYM:-scl}
+      CROSSREF_API_PASSWORD: ${CROSSREF_API_PASSWORD:-}
+      CROSSREF_API_USER: ${CROSSREF_API_USER:-}
+      CROSSREF_DEPOSITOR_EMAIL: ${CROSSREF_DEPOSITOR_EMAIL:-}
+      CROSSREF_DEPOSITOR_NAME: ${CROSSREF_DEPOSITOR_NAME:-}
+      CROSSREF_PREFIX: ${CROSSREF_PREFIX:-10.1590}
+      LOGGING_LEVEL: ${LOGGING_LEVEL:-INFO}
+      SQL_ENGINE: postgresql+psycopg://postgres:password@db:5432/doi_manager
     networks:
     - appnetwork
     command: ["alembic", "upgrade", "head"]
     depends_on:
-    - db
+      db:
+        condition: service_healthy
   celeryworker:
     build: .
-    image: ${APP_IMAGE}
+    image: ${APP_IMAGE:-doi_request:local}
     environment:
-      COLLECTION_ACRONYM: ${COLLECTION_ACRONYM}
-      CROSSREF_API_PASSWORD: ${CROSSREF_API_PASSWORD}
-      CROSSREF_API_USER: ${CROSSREF_API_USER}
-      CROSSREF_DEPOSITOR_EMAIL: ${CROSSREF_DEPOSITOR_EMAIL}
-      CROSSREF_DEPOSITOR_NAME: ${CROSSREF_DEPOSITOR_NAME}
-      CROSSREF_PREFIX: ${CROSSREF_PREFIX}
+      COLLECTION_ACRONYM: ${COLLECTION_ACRONYM:-scl}
+      CROSSREF_API_PASSWORD: ${CROSSREF_API_PASSWORD:-}
+      CROSSREF_API_USER: ${CROSSREF_API_USER:-}
+      CROSSREF_DEPOSITOR_EMAIL: ${CROSSREF_DEPOSITOR_EMAIL:-}
+      CROSSREF_DEPOSITOR_NAME: ${CROSSREF_DEPOSITOR_NAME:-}
+      CROSSREF_PREFIX: ${CROSSREF_PREFIX:-10.1590}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/0}
       C_FORCE_ROOT: 'true'
-      SQL_ENGINE: postgresql://postgres:password@db:5432/doi_manager
+      SQL_ENGINE: postgresql+psycopg://postgres:password@db:5432/doi_manager
       SUGGEST_DOI_IDENTIFICATION: 'False'
       USE_DOCKER: 'true'
     networks:
     - appnetwork
     command: ["celery", "-A", "tasks.celery", "worker", "-l", "INFO"]
     depends_on:
-    - db
-    - redis
-    - dashboard
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      dashboard:
+        condition: service_started
   exportdoi:
     build: .
-    image: ${APP_IMAGE}
+    image: ${APP_IMAGE:-doi_request:local}
     environment:
-      ARTICLEMETA_ADMINTOKEN: ${ARTICLEMETA_ADMINTOKEN}
-      ARTICLEMETA_THRIFTSERVER: ${ARTICLEMETA_THRIFTSERVER}
-      COLLECTION_ACRONYM: ${COLLECTION_ACRONYM}
-      CROSSREF_API_PASSWORD: ${CROSSREF_API_PASSWORD}
-      CROSSREF_API_USER: ${CROSSREF_API_USER}
-      CROSSREF_DEPOSITOR_EMAIL: ${CROSSREF_DEPOSITOR_EMAIL}
-      CROSSREF_DEPOSITOR_NAME: ${CROSSREF_DEPOSITOR_NAME}
-      CROSSREF_PREFIX: ${CROSSREF_PREFIX}
-      LOGGING_LEVEL: ${LOGGING_LEVEL}
-      SQL_ENGINE: postgresql://postgres:password@db:5432/doi_manager
+      ARTICLEMETA_ADMINTOKEN: ${ARTICLEMETA_ADMINTOKEN:-}
+      ARTICLEMETA_THRIFTSERVER: ${ARTICLEMETA_THRIFTSERVER:-articlemeta.scielo.org:11621}
+      COLLECTION_ACRONYM: ${COLLECTION_ACRONYM:-scl}
+      CROSSREF_API_PASSWORD: ${CROSSREF_API_PASSWORD:-}
+      CROSSREF_API_USER: ${CROSSREF_API_USER:-}
+      CROSSREF_DEPOSITOR_EMAIL: ${CROSSREF_DEPOSITOR_EMAIL:-}
+      CROSSREF_DEPOSITOR_NAME: ${CROSSREF_DEPOSITOR_NAME:-}
+      CROSSREF_PREFIX: ${CROSSREF_PREFIX:-10.1590}
+      LOGGING_LEVEL: ${LOGGING_LEVEL:-INFO}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/0}
+      SQL_ENGINE: postgresql+psycopg://postgres:password@db:5432/doi_manager
+    networks:
+    - appnetwork
     command: ["processing_export_doi", "-c", "scl", "-r", "7", "-l", "DEBUG"]
     depends_on:
-    - celeryworker
+      celeryworker:
+        condition: service_started
+      redis:
+        condition: service_started
   celeryworker-dispatcher:
     build: .
-    image: ${APP_IMAGE}
+    image: ${APP_IMAGE:-doi_request:local}
     environment:
-      COLLECTION_ACRONYM: ${COLLECTION_ACRONYM}
-      CROSSREF_API_PASSWORD: ${CROSSREF_API_PASSWORD}
-      CROSSREF_API_USER: ${CROSSREF_API_USER}
-      CROSSREF_DEPOSITOR_EMAIL: ${CROSSREF_DEPOSITOR_EMAIL}
-      CROSSREF_DEPOSITOR_NAME: ${CROSSREF_DEPOSITOR_NAME}
-      CROSSREF_PREFIX: ${CROSSREF_PREFIX}
+      COLLECTION_ACRONYM: ${COLLECTION_ACRONYM:-scl}
+      CROSSREF_API_PASSWORD: ${CROSSREF_API_PASSWORD:-}
+      CROSSREF_API_USER: ${CROSSREF_API_USER:-}
+      CROSSREF_DEPOSITOR_EMAIL: ${CROSSREF_DEPOSITOR_EMAIL:-}
+      CROSSREF_DEPOSITOR_NAME: ${CROSSREF_DEPOSITOR_NAME:-}
+      CROSSREF_PREFIX: ${CROSSREF_PREFIX:-10.1590}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/0}
       C_FORCE_ROOT: 'true'
       REGISTER_DOI_DELAY_RETRY: '600'
       REGISTER_DOI_MAX_RETRY: '20000'
-      SQL_ENGINE: postgresql://postgres:password@db:5432/doi_manager
+      SQL_ENGINE: postgresql+psycopg://postgres:password@db:5432/doi_manager
       USE_DOCKER: 'true'
     networks:
     - appnetwork
     command: ["celery", "-A", "tasks.celery", "worker", "-l", "INFO", "-Q", "dispatcher"]
     depends_on:
-    - celeryworker
+      celeryworker:
+        condition: service_started
   redis:
     image: redis
     networks:
     - appnetwork
   celeryworker-releaser:
     build: .
-    image: ${APP_IMAGE}
+    image: ${APP_IMAGE:-doi_request:local}
     environment:
-      COLLECTION_ACRONYM: ${COLLECTION_ACRONYM}
-      CROSSREF_API_PASSWORD: ${CROSSREF_API_PASSWORD}
-      CROSSREF_API_USER: ${CROSSREF_API_USER}
-      CROSSREF_DEPOSITOR_EMAIL: ${CROSSREF_DEPOSITOR_EMAIL}
-      CROSSREF_DEPOSITOR_NAME: ${CROSSREF_DEPOSITOR_NAME}
-      CROSSREF_PREFIX: ${CROSSREF_PREFIX}
+      COLLECTION_ACRONYM: ${COLLECTION_ACRONYM:-scl}
+      CROSSREF_API_PASSWORD: ${CROSSREF_API_PASSWORD:-}
+      CROSSREF_API_USER: ${CROSSREF_API_USER:-}
+      CROSSREF_DEPOSITOR_EMAIL: ${CROSSREF_DEPOSITOR_EMAIL:-}
+      CROSSREF_DEPOSITOR_NAME: ${CROSSREF_DEPOSITOR_NAME:-}
+      CROSSREF_PREFIX: ${CROSSREF_PREFIX:-10.1590}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/0}
       C_FORCE_ROOT: 'true'
       REQUEST_DOI_DELAY_RETRY: '600'
       REQUEST_DOI_MAX_RETRY: '20000'
-      SQL_ENGINE: postgresql://postgres:password@db:5432/doi_manager
+      SQL_ENGINE: postgresql+psycopg://postgres:password@db:5432/doi_manager
       USE_DOCKER: 'true'
     networks:
     - appnetwork
     command: ["celery", "-A", "tasks.celery", "worker", "-l", "INFO", "-Q", "releaser"]
     depends_on:
-    - celeryworker
+      celeryworker:
+        condition: service_started
   dashboard:
     build: .
-    image: ${APP_IMAGE}
+    image: ${APP_IMAGE:-doi_request:local}
     environment:
-      ARTICLEMETA_ADMINTOKEN: ${ARTICLEMETA_ADMINTOKEN}
-      ARTICLEMETA_THRIFTSERVER: ${ARTICLEMETA_THRIFTSERVER}
-      COLLECTION_ACRONYM: ${COLLECTION_ACRONYM}
-      CROSSREF_API_PASSWORD: ${CROSSREF_API_PASSWORD}
-      CROSSREF_API_USER: ${CROSSREF_API_USER}
-      CROSSREF_DEPOSITOR_EMAIL: ${CROSSREF_DEPOSITOR_EMAIL}
-      CROSSREF_DEPOSITOR_NAME: ${CROSSREF_DEPOSITOR_NAME}
-      CROSSREF_PREFIX: ${CROSSREF_PREFIX}
-      LOGGING_LEVEL: ${LOGGING_LEVEL}
-      SQL_ENGINE: postgresql://postgres:password@db:5432/doi_manager
+      ARTICLEMETA_ADMINTOKEN: ${ARTICLEMETA_ADMINTOKEN:-}
+      ARTICLEMETA_THRIFTSERVER: ${ARTICLEMETA_THRIFTSERVER:-articlemeta.scielo.org:11621}
+      COLLECTION_ACRONYM: ${COLLECTION_ACRONYM:-scl}
+      CROSSREF_API_PASSWORD: ${CROSSREF_API_PASSWORD:-}
+      CROSSREF_API_USER: ${CROSSREF_API_USER:-}
+      CROSSREF_DEPOSITOR_EMAIL: ${CROSSREF_DEPOSITOR_EMAIL:-}
+      CROSSREF_DEPOSITOR_NAME: ${CROSSREF_DEPOSITOR_NAME:-}
+      CROSSREF_PREFIX: ${CROSSREF_PREFIX:-10.1590}
+      LOGGING_LEVEL: ${LOGGING_LEVEL:-INFO}
+      SQL_ENGINE: postgresql+psycopg://postgres:password@db:5432/doi_manager
       STATIC_MEDIA: /app/doi_request/media
     networks:
     - appnetwork
@@ -127,12 +140,19 @@ services:
     - 6543:6543/tcp
     command: ["pserve", "/app/config.ini"]
     depends_on:
-    - db
+      db:
+        condition: service_healthy
   db:
     image: postgres
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: doi_manager
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: ${POSTGRES_DB:-doi_manager}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-doi_manager}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
     networks:
     - appnetwork
