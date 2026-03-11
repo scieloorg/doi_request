@@ -74,7 +74,7 @@
         <div class="has-feedback">
           <form name="query_by_id" action="${request.route_url('list_deposits')}" method="get">
             <div class="input-group">
-              <input type="text" name="filter_pid_doi" class="form-control" placeholder="${_(u'pesquise por DOI ou PID')}">
+              <input type="text" name="filter_pid_doi" class="form-control" value="${filter_pid_doi or ''}" placeholder="${_(u'pesquise por qualquer termo')}">
               <span class="input-group-btn">
                 <button type="submit" id="search-btn" class="btn btn-default btn-flat"><i class="fa fa-search"></i>
                 </button>

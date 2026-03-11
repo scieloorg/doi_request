@@ -18,6 +18,29 @@ from doi_request.utils import pagination_ruler
 
 depositor = controller.Depositor()
 LIMIT = 100
+SEARCHABLE_DEPOSIT_FIELDS = (
+    Deposit.code,
+    Deposit.pid,
+    Deposit.doi,
+    Deposit.issn,
+    Deposit.prefix,
+    Deposit.journal,
+    Deposit.journal_acronym,
+    Deposit.volume,
+    Deposit.number,
+    Deposit.issue_label,
+    Deposit.xml_file_name,
+)
+
+
+def search_deposits(query, raw_term):
+    search_term = (raw_term or '').strip()
+    if not search_term:
+        return query, ''
+
+    search_pattern = '%%%s%%' % search_term
+    filters = [field.ilike(search_pattern) for field in SEARCHABLE_DEPOSIT_FIELDS]
+    return query.filter(or_(*filters)), search_term
 
 @view_config(route_name='list_deposits', renderer='templates/deposits.mako')
 @check_session
@@ -31,9 +54,12 @@ def list_deposits(request):
     from_date_dt = datetime.strptime(request.session['filter_start_range'].split('-')[0].strip(), '%m/%d/%Y')
     total = 0
     filter_string = []
-    if filter_pid_doi:
-        filter_string.append('DOI/PID=%s' % filter_pid_doi)
-        deposits = request.db.query(Deposit).filter(or_(Deposit.doi == filter_pid_doi, Deposit.pid == filter_pid_doi))
+    if filter_pid_doi and filter_pid_doi.strip():
+        deposits, search_term = search_deposits(
+            request.db.query(Deposit),
+            filter_pid_doi,
+        )
+        filter_string.append('search=%s' % search_term)
     else:
         deposits = request.db.query(Deposit).filter(and_(Deposit.started_at >= from_date_dt, Deposit.started_at <= to_date_dt))
         filter_string.append('processing_date between %s and %s' % (from_date_dt.isoformat()[:10], to_date_dt.isoformat()[:10]))
@@ -70,6 +96,7 @@ def list_deposits(request):
     data['filter_submission_status'] = request.session['filter_submission_status']
     data['filter_issn'] = request.session['filter_issn']
     data['filter_prefix'] = request.session['filter_prefix']
+    data['filter_pid_doi'] = (filter_pid_doi or '').strip()
     data['filter_string'] = filter_string
     data['offset'] = request.session['deposits_offset']
     data['limit'] = LIMIT if LIMIT <= total else total + 1

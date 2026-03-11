@@ -52,7 +52,7 @@
               </ul>
               <form action="${request.route_url('list_deposits')}" method="get" class="navbar-form navbar-left" role="search">
                 <div class="input-group">
-                  <input type="text" name="filter_pid_doi" id="navbar-search-input" class="form-control" placeholder="${_(u'pesquise por DOI ou PID')}">
+                  <input type="text" name="filter_pid_doi" id="navbar-search-input" class="form-control" value="${request.GET.get('filter_pid_doi', '')}" placeholder="${_(u'pesquise por qualquer termo')}">
                 </div>
               </form>
             </div>
