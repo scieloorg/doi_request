@@ -6,7 +6,7 @@ from sqlalchemy.orm import sessionmaker
 
 from doi_request.models import Base
 from doi_request.models.depositor import Deposit
-from doi_request.views import search_deposits
+from doi_request.views import apply_deposit_sort, search_deposits
 
 
 class DepositSearchTest(unittest.TestCase):
@@ -32,6 +32,8 @@ class DepositSearchTest(unittest.TestCase):
                 xml_file_name='S1518-29242026000101002.xml',
                 prefix='10.1590',
                 doi='10.1590/S1518-29242026000101002',
+                submission_status='registered',
+                feedback_status='success',
                 started_at=started_at,
                 updated_at=started_at,
             ),
@@ -49,6 +51,27 @@ class DepositSearchTest(unittest.TestCase):
                 xml_file_name='S0102-311X2026000100001.xml',
                 prefix='10.1590',
                 doi='10.1590/S0102-311X2026000100001',
+                submission_status='submitted',
+                feedback_status='queued',
+                started_at=started_at,
+                updated_at=started_at,
+            ),
+            Deposit(
+                code='scl_S0103-40142026000100002',
+                pid='S0103-40142026000100002',
+                issn='0103-4014',
+                volume='4',
+                number='2',
+                issue_label='v4n2',
+                journal='Estudos Avancados',
+                journal_acronym='ea',
+                collection_acronym='scl',
+                publication_year=2026,
+                xml_file_name='S0103-40142026000100002.xml',
+                prefix='10.1590',
+                doi='10.1590/S0103-40142026000100002',
+                submission_status='done',
+                feedback_status='error',
                 started_at=started_at,
                 updated_at=started_at,
             ),
@@ -88,4 +111,28 @@ class DepositSearchTest(unittest.TestCase):
         )
 
         self.assertEqual(search_term, '')
-        self.assertEqual(query.count(), 2)
+        self.assertEqual(query.count(), 3)
+
+    def test_apply_deposit_sort_orders_by_submission_status(self):
+        query, sort_key = apply_deposit_sort(
+            self.session.query(Deposit),
+            'submission_status_asc',
+        )
+
+        self.assertEqual(sort_key, 'submission_status_asc')
+        self.assertEqual(
+            [item.submission_status for item in query.all()],
+            ['done', 'registered', 'submitted'],
+        )
+
+    def test_apply_deposit_sort_orders_by_feedback_status_desc(self):
+        query, sort_key = apply_deposit_sort(
+            self.session.query(Deposit),
+            'feedback_status_desc',
+        )
+
+        self.assertEqual(sort_key, 'feedback_status_desc')
+        self.assertEqual(
+            [item.feedback_status for item in query.all()],
+            ['success', 'queued', 'error'],
+        )

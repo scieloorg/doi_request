@@ -52,6 +52,14 @@
           </select>
         </div>
         <div class="form-group">
+          <label>${_(u'Ordenação')}</label>
+          <select name="filter_sort" class="form-control">
+            % for sort_key, sort_data in deposit_sort_options.items():
+              <option value="${sort_key}" ${'selected' if filter_sort == sort_key else ''}>${_(sort_data[0])}</option>
+            % endfor
+          </select>
+        </div>
+        <div class="form-group">
           <label>${_(u'Data de início de processo')}</label>
           <div class="input-group">
             <div class="input-group-addon">

@@ -7,7 +7,7 @@ from pyramid.httpexceptions import HTTPFound
 from pyramid.view import view_config
 import pyramid.httpexceptions as exc
 
-from sqlalchemy import desc, func, or_, and_
+from sqlalchemy import desc, func, or_, and_, asc
 
 from doi_request.models.depositor import Deposit, Expenses
 from doi_request import template_choices
@@ -18,6 +18,14 @@ from doi_request.utils import pagination_ruler
 
 depositor = controller.Depositor()
 LIMIT = 100
+DEPOSIT_SORT_OPTIONS = {
+    'started_at_desc': ('Mais recentes primeiro', (desc(Deposit.started_at), desc(Deposit.code))),
+    'started_at_asc': ('Mais antigos primeiro', (asc(Deposit.started_at), asc(Deposit.code))),
+    'submission_status_asc': ('Situação de submissão (A-Z)', (asc(func.coalesce(Deposit.submission_status, '')), desc(Deposit.started_at), desc(Deposit.code))),
+    'submission_status_desc': ('Situação de submissão (Z-A)', (desc(func.coalesce(Deposit.submission_status, '')), desc(Deposit.started_at), desc(Deposit.code))),
+    'feedback_status_asc': ('Situação de depósito (A-Z)', (asc(func.coalesce(Deposit.feedback_status, '')), desc(Deposit.started_at), desc(Deposit.code))),
+    'feedback_status_desc': ('Situação de depósito (Z-A)', (desc(func.coalesce(Deposit.feedback_status, '')), desc(Deposit.started_at), desc(Deposit.code))),
+}
 SEARCHABLE_DEPOSIT_FIELDS = (
     Deposit.code,
     Deposit.pid,
@@ -42,12 +50,19 @@ def search_deposits(query, raw_term):
     filters = [field.ilike(search_pattern) for field in SEARCHABLE_DEPOSIT_FIELDS]
     return query.filter(or_(*filters)), search_term
 
+
+def apply_deposit_sort(query, raw_sort_key):
+    sort_key = raw_sort_key if raw_sort_key in DEPOSIT_SORT_OPTIONS else 'started_at_desc'
+    _, order_by = DEPOSIT_SORT_OPTIONS[sort_key]
+    return query.order_by(*order_by), sort_key
+
 @view_config(route_name='list_deposits', renderer='templates/deposits.mako')
 @check_session
 @base_data_manager
 def list_deposits(request):
     data = request.data_manager
     filter_pid_doi = request.GET.get('filter_pid_doi', None)
+    filter_sort = request.session.get('filter_sort', 'started_at_desc')
     to_date = request.session['filter_start_range'].split('-')[1].strip()
     to_date_dt = datetime.strptime(request.session['filter_start_range'].split('-')[1].strip(), '%m/%d/%Y')
     from_date = request.session['filter_start_range'].split('-')[0].strip()
@@ -84,7 +99,8 @@ def list_deposits(request):
 
     total = deposits.count()
     request.session['deposits_offset'] = request.session['deposits_offset'] if request.session['deposits_offset'] < total else 0
-    deposits = deposits.order_by(desc('started_at')).limit(LIMIT).offset(request.session['deposits_offset'] )
+    deposits, filter_sort = apply_deposit_sort(deposits, filter_sort)
+    deposits = deposits.limit(LIMIT).offset(request.session['deposits_offset'] )
     data['deposits'] = deposits
     data['submission_status_to_template'] = template_choices.SUBMISSION_STATUS_TO_TEMPLATE
     data['feedback_status_to_template'] = template_choices.FEEDBACK_STATUS_TO_TEMPLATE
@@ -97,6 +113,8 @@ def list_deposits(request):
     data['filter_issn'] = request.session['filter_issn']
     data['filter_prefix'] = request.session['filter_prefix']
     data['filter_pid_doi'] = (filter_pid_doi or '').strip()
+    data['filter_sort'] = filter_sort
+    data['deposit_sort_options'] = DEPOSIT_SORT_OPTIONS
     data['filter_string'] = filter_string
     data['offset'] = request.session['deposits_offset']
     data['limit'] = LIMIT if LIMIT <= total else total + 1
