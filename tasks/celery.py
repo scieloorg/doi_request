@@ -1,8 +1,8 @@
 import os
 from io import BytesIO
-from datetime import datetime
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 import functools
+from pathlib import Path
 
 from celery import Celery
 from celery import Task, chain
@@ -19,7 +19,10 @@ from utils.settings import asbool
 logger = get_task_logger(__name__)
 
 # Celery Config
-app = Celery('tasks', broker='redis://redis:6379/0')
+CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL', 'redis://redis:6379/0')
+app = Celery('tasks', broker=CELERY_BROKER_URL)
+app.conf.broker_connection_retry_on_startup = True
+app.conf.task_ignore_result = True
 
 
 
@@ -50,7 +53,7 @@ REGISTER_DOI_DELAY_RETRY = int(os.environ.get('REGISTER_DOI_DELAY_RETRY', '600')
 REQUEST_DOI_DELAY_RETRY_TD = timedelta(seconds=REQUEST_DOI_DELAY_RETRY)
 REGISTER_DOI_DELAY_RETRY_TD = timedelta(seconds=REGISTER_DOI_DELAY_RETRY)
 SUGGEST_DOI_IDENTIFICATION = asbool(os.environ.get('SUGGEST_DOI_IDENTIFICATION', False))
-CROSSREF_XSD = open(os.path.dirname(__file__)+'/../xsd/crossref4.4.0.xsd')
+CROSSREF_XSD = Path(__file__).resolve().parent.parent / 'xsd' / 'crossref4.4.0.xsd'
 CROSSREF_PREFIX = os.environ.get('CROSSREF_PREFIX', None)
 CROSSREF_API_USER = os.environ.get('CROSSREF_API_USER', None)
 CROSSREF_API_PASSWORD = os.environ.get('CROSSREF_API_PASSWORD', None)
@@ -66,7 +69,7 @@ crossref_client = CrossrefClient(
 def _parse_schema():
 
     try:
-        sch_doc = etree.parse(CROSSREF_XSD)
+        sch_doc = etree.parse(str(CROSSREF_XSD))
         sch = etree.XMLSchema(sch_doc)
     except Exception as e:
         logger.exception(e)
@@ -94,6 +97,10 @@ def log_event(session, data):
     session.add(log)
 
 
+def utcnow():
+    return datetime.now(timezone.utc)
+
+
 @app.task(bind=True, throws=(ChainAborted,))
 @log_call
 def triage_deposit(self, code):
@@ -104,8 +111,8 @@ def triage_deposit(self, code):
 
         if not deposit.doi:
             logger.info('cannot get DOI from deposit "%s" of code "%s"',
-                    deposit.id, code)
-            now = datetime.now()
+                    deposit.pid, code)
+            now = utcnow()
             deposit.submission_status = 'error'
             deposit.submission_updated_at = now
             deposit.updated_at = now
@@ -114,7 +121,7 @@ def triage_deposit(self, code):
             log_event(session, {'title': log_title, 'type': 'submission', 'status': 'error', 'deposit_code': code})
 
         elif deposit.prefix.lower() != CROSSREF_PREFIX.lower():
-            now = datetime.now()
+            now = utcnow()
             deposit.submission_status = 'notapplicable'
             deposit.feedback_status = 'notapplicable'
             deposit.submission_updated_at = now
@@ -153,8 +160,8 @@ def load_xml_from_articlemeta(self, code):
             logger.exception(exc)
 
             deposit.submission_status = 'error'
-            deposit.submission_updated_at = datetime.now()
-            deposit.updated_at = datetime.now()
+            deposit.submission_updated_at = utcnow()
+            deposit.updated_at = utcnow()
 
             log_title = 'Fail to load XML document from ArticleMeta (%s)' % code
             log_event(session, {'title': log_title, 'body': str(exc), 'type': 'submission', 'status': 'error', 'deposit_code': code})
@@ -164,8 +171,8 @@ def load_xml_from_articlemeta(self, code):
         else:
             deposit.submission_status = 'waiting'
             deposit.submission_xml = xml
-            deposit.submission_updated_at = datetime.now()
-            deposit.updated_at = datetime.now()
+            deposit.submission_updated_at = utcnow()
+            deposit.updated_at = utcnow()
 
             log_title = 'XML Document loaded from ArticleMeta (%s)' % code
             log_event(session, {'title': log_title, 'type': 'submission', 'status': 'success', 'deposit_code': code})
@@ -234,7 +241,7 @@ def prepare_document(self, code):
 
         if is_valid is True:
             log_title = 'XML is valid, it will be submitted to Crossref'
-            now = datetime.now()
+            now = utcnow()
             logger.info(log_title)
             deposit.is_xml_valid = True
             deposit.has_submission_xml_valid_references = True
@@ -247,7 +254,7 @@ def prepare_document(self, code):
             return code
 
         log_title = 'XML with references is invalid, fail to parse xml for document (%s)' % code
-        now = datetime.now()
+        now = utcnow()
         logger.warning(log_title)
         deposit.is_xml_valid = False
         deposit.submission_status = 'error'
@@ -257,7 +264,7 @@ def prepare_document(self, code):
         log_event(session, {'title': log_title, 'body': str(exc), 'type': 'submission', 'status': 'error', 'deposit_code': code})
 
         log_title = 'Trying to send XML without references'
-        now = datetime.now()
+        now = utcnow()
         logger.debug(log_title)
 
         log_event(session, {'title': log_title, 'type': 'submission', 'status': 'info', 'deposit_code': code})
@@ -269,7 +276,7 @@ def prepare_document(self, code):
 
         if is_valid is True:
             log_title = 'XML only with front metadata is valid, it will be submitted to Crossref'
-            now = datetime.now()
+            now = utcnow()
             logger.info(log_title)
             deposit.is_xml_valid = True
             deposit.submission_status = 'waiting'
@@ -282,7 +289,7 @@ def prepare_document(self, code):
             return code
 
         log_title = 'XML only with front metadata is also invalid, fail to parse xml for document (%s)' % code
-        now = datetime.now()
+        now = utcnow()
         logger.error(log_title)
         deposit.is_xml_valid = False
         deposit.submission_status = 'error'
@@ -310,11 +317,11 @@ def register_doi(self, code):
             result = crossref_client.register_doi(code, deposit.submission_xml)
         except Exception as exc:
             log_title = 'Fail to Connect to Crossref API, retrying at (%s) to submit (%s)' % (
-                datetime.now()+REGISTER_DOI_DELAY_RETRY_TD, code
+                utcnow()+REGISTER_DOI_DELAY_RETRY_TD, code
             )
             logger.error(log_title)
 
-            now = datetime.now()
+            now = utcnow()
             deposit.submission_status = 'waiting'
             deposit.submission_updated_at = now
             deposit.updated_at = now
@@ -325,10 +332,10 @@ def register_doi(self, code):
 
             if result.status_code != 200:
                 log_title = 'Fail to Connect to Crossref API, retrying at (%s) to submit (%s)' % (
-                    datetime.now()+REGISTER_DOI_DELAY_RETRY_TD, code
+                    utcnow()+REGISTER_DOI_DELAY_RETRY_TD, code
                 )
                 logger.error(log_title)
-                now = datetime.now()
+                now = utcnow()
                 deposit.submission_log = log_title
                 deposit.submission_status = 'waiting'
                 deposit.submission_updated_at = now
@@ -340,7 +347,7 @@ def register_doi(self, code):
             elif result.status_code == 200 and 'SUCCESS' in result.text:
                 log_title = 'Success sending metadata for (%s)' % code
                 logger.debug(log_title)
-                now = datetime.now()
+                now = utcnow()
                 deposit.submission_status = 'success'
                 deposit.submission_updated_at = now
                 deposit.updated_at = now
@@ -350,7 +357,7 @@ def register_doi(self, code):
 
             else:
                 log_title = 'Fail registering DOI for (%s)' % code
-                now = datetime.now()
+                now = utcnow()
                 deposit.submission_status = 'error'
                 deposit.submission_updated_at = now
                 deposit.updated_at = now
@@ -376,7 +383,7 @@ class CallbackTask(Task):
                 deposit.doi, deposit.doi_batch_id
             )
             logger.error(log_title)
-            now = datetime.now()
+            now = utcnow()
             deposit.feedback_status = 'error'
             deposit.feedback_updated_at = now
             deposit.updated_at = now
@@ -393,7 +400,7 @@ def request_doi_status(self, code):
         deposit = session.query(Deposit).filter_by(code=code).first()
 
         log_title = 'Checking DOI registering Status for (%s)' % deposit.doi_batch_id
-        now = datetime.now()
+        now = utcnow()
         deposit.feedback_status = 'waiting'
         deposit.feedback_updated_at = now
         deposit.updated_at = now
@@ -404,10 +411,10 @@ def request_doi_status(self, code):
             result = crossref_client.request_doi_status_by_batch_id(deposit.doi_batch_id)
         except Exception as exc:
             log_title = 'Fail to Connect to Crossref API, retrying to check submission status at (%s) for (%s)' % (
-                datetime.now()+REQUEST_DOI_DELAY_RETRY_TD, deposit.doi_batch_id
+                utcnow()+REQUEST_DOI_DELAY_RETRY_TD, deposit.doi_batch_id
             )
             logger.error(log_title)
-            now = datetime.now()
+            now = utcnow()
             deposit.feedback_status = 'waiting'
             deposit.feedback_updated_at = now
             deposit.updated_at = now
@@ -422,7 +429,7 @@ def request_doi_status(self, code):
             doi_batch_status = xml_doc.find('.').get('status')
 
             if result.status_code != 200:
-                now = datetime.now()
+                now = utcnow()
                 log_title = 'Fail to Connect to Crossref API, retrying to check submission status at (%s) (%s)' % (
                     now+REQUEST_DOI_DELAY_RETRY_TD, deposit.doi_batch_id
                 )
@@ -436,7 +443,7 @@ def request_doi_status(self, code):
             elif doi_batch_status != 'completed':
                 log_title = 'Crossref has received the request, waiting Crossref to process it (%s)' % deposit.doi_batch_id
                 logger.error(log_title)
-                now = datetime.now()
+                now = utcnow()
                 deposit.feedback_status = 'waiting'
                 deposit.feedback_updated_at = now
                 deposit.updated_at = now
@@ -449,7 +456,7 @@ def request_doi_status(self, code):
                 feedback_body = xml_doc.find('.//record_diagnostic/msg').text or ''
                 log_title = 'Crossref final status for (%s) is (%s)' % (deposit.doi_batch_id, feedback_status)
                 logger.info(log_title)
-                now = datetime.now()
+                now = utcnow()
                 deposit.feedback_status = feedback_status
                 deposit.feedback_xml = etree.tostring(xml_doc).decode('utf-8')
                 deposit.updated_at = now
@@ -459,10 +466,10 @@ def request_doi_status(self, code):
 
                 if feedback_status == 'success' and 'added' in feedback_body.lower():
                     #crossref backfiles limit current year - 2.
-                    back_file_limit = int(datetime.now().strftime('%Y')) - 2
+                    back_file_limit = int(utcnow().strftime('%Y')) - 2
                     expenses = Expenses()
                     expenses.publication_year = deposit.publication_year
-                    expenses.registry_date = datetime.now()
+                    expenses.registry_date = utcnow()
                     expenses.doi = deposit.doi
                     expenses.cost = 0.15 if int(deposit.publication_year) < back_file_limit else 1
                     expenses.retro = True if int(deposit.publication_year) < back_file_limit else False
@@ -505,7 +512,7 @@ def _registry_dispatcher_document(code, collection, skip_deposited):
     xml_file_name = '%s.xml' % code
     doi = document.doi or ''
     doi_prefix = document.doi.split('/')[0] if doi else ''
-    now = datetime.now()
+    now = utcnow()
 
     if SUGGEST_DOI_IDENTIFICATION is True and not doi:
         doi_prefix = CROSSREF_PREFIX
@@ -545,8 +552,7 @@ def _registry_dispatcher_document(code, collection, skip_deposited):
         
         session.add(depitem)
 
-    logger.info('deposit successfuly created for "%s": %s', code,
-            repr(deposit))
+    logger.info('deposit successfuly created for "%s": %s', code, repr(depitem))
 
     chain(
         triage_deposit.s(code).set(queue='dispatcher'),
@@ -555,4 +561,3 @@ def _registry_dispatcher_document(code, collection, skip_deposited):
         register_doi.s().set(queue='dispatcher'),
         request_doi_status.s().set(queue='releaser')
     ).delay()
-

@@ -1,7 +1,6 @@
 import os
 
-from datetime import datetime
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 
 def check_session(wrapped):
@@ -10,7 +9,7 @@ def check_session(wrapped):
     """
 
     def check(request, *arg, **kwargs):
-        to_date = datetime.now() + timedelta(days=1)
+        to_date = datetime.now(timezone.utc) + timedelta(days=1)
         from_date = to_date - timedelta(days=30)
         default_date_range = ' - '.join([
             from_date.strftime('%m/%d/%Y')[:10],
@@ -58,7 +57,7 @@ def check_session(wrapped):
         )
         expenses_period = request.GET.get(
             'expenses_period',
-            request.session.get('expenses_period', datetime.now().isoformat())
+            request.session.get('expenses_period', datetime.now(timezone.utc).isoformat())
         )
 
         request.session['deposits_offset'] = int(deposits_offset)

@@ -26,8 +26,9 @@ import logging.config
 
 from lxml import etree
 
-from doi_request.models.depositor import Deposit, LogEvent, Expenses
-from doi_request.models import configure_session_engine, DBSession
+from doi_request.models.depositor import Deposit
+from doi_request.models import configure_session_engine, transactional_session
+from processing.utils import setup_sentry
 
 logger = logging.getLogger(__name__)
 
@@ -68,14 +69,6 @@ LOGGING = {
     }
 }
 
-if SENTRY_HANDLER:
-    LOGGING['handlers']['sentry'] = {
-        'level': 'ERROR',
-        'class': 'raven.handlers.logging.SentryHandler',
-        'dsn': SENTRY_HANDLER,
-    }
-    LOGGING['loggers']['']['handlers'].append('sentry')
-
 # Database Config
 configure_session_engine()
 
@@ -106,43 +99,44 @@ class Export2Id(object):
     def write(self, line):
 
         if not self.output_file:
-            print(line.encode('utf-8'))
+            print(line)
         else:
             self.output_file.write('%s\r\n' % line)
 
     def run(self):
         logger.info("Processing started")
 
-        deposits = DBSession.query(
-            Deposit.doi, Deposit.pid, Deposit.feedback_xml, Deposit.code
-        )
+        with transactional_session() as session:
+            deposits = session.query(
+                Deposit.doi, Deposit.pid, Deposit.feedback_xml, Deposit.code
+            )
 
-        ndx = 0
+            ndx = 0
 
-        for deposit in deposits:
-            logger.debug("Reading registry (%s)", deposit.code)
-            if not deposit.doi:
-                continue
-            ndx += 1
-            self.write('!ID %s' % str(ndx))
-            self.write('!v880!%s' % deposit.pid)
-            self.write('!v001!%s' % deposit.doi)
-            self.write('!v237!%s' % deposit.doi)
-            self.write('!v003!%s' % 'art')
-
-            if not deposit.feedback_xml:
-                logger.debug('Crossref reponse XML not available, skiping references DOI checking')
-                continue
-
-            for reference in self.extract_ref_dois(deposit.feedback_xml):
-                if not reference:
+            for deposit in deposits:
+                logger.debug("Reading registry (%s)", deposit.code)
+                if not deposit.doi:
                     continue
                 ndx += 1
                 self.write('!ID %s' % str(ndx))
-                self.write('!v880!%s' % deposit.pid+reference[0])
-                self.write('!v001!%s' % reference[1])
-                self.write('!v003!%s' % 'ref')
-                self.write('!v237!%s' % reference[1])
+                self.write('!v880!%s' % deposit.pid)
+                self.write('!v001!%s' % deposit.doi)
+                self.write('!v237!%s' % deposit.doi)
+                self.write('!v003!%s' % 'art')
+
+                if not deposit.feedback_xml:
+                    logger.debug('Crossref reponse XML not available, skiping references DOI checking')
+                    continue
+
+                for reference in self.extract_ref_dois(deposit.feedback_xml):
+                    if not reference:
+                        continue
+                    ndx += 1
+                    self.write('!ID %s' % str(ndx))
+                    self.write('!v880!%s' % deposit.pid+reference[0])
+                    self.write('!v001!%s' % reference[1])
+                    self.write('!v003!%s' % 'ref')
+                    self.write('!v237!%s' % reference[1])
 
         logger.info("Processing finished")
 
@@ -172,6 +166,7 @@ def main():
     for content in LOGGING['loggers'].values():
         content['level'] = args.logging_level
     logging.config.dictConfig(LOGGING)
+    setup_sentry(SENTRY_HANDLER)
 
     export = Export2Id(args.output_file)
 

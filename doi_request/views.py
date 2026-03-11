@@ -10,7 +10,6 @@ import pyramid.httpexceptions as exc
 from sqlalchemy import desc, func, or_, and_
 
 from doi_request.models.depositor import Deposit, Expenses
-from doi_request.models import DBSession
 from doi_request import template_choices
 from doi_request import controller
 from doi_request.control_manager import check_session

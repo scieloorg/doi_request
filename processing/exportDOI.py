@@ -5,7 +5,7 @@ Este processamento realiza a exportação de registros SciELO para o Crossref
 import os
 import argparse
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from articlemeta.client import ThriftClient
 
@@ -16,9 +16,9 @@ logger = logging.getLogger('exportDOI')
 
 LOGGER_FMT = '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
 
-FROM = datetime.now() - timedelta(days=30)
+FROM = datetime.now(timezone.utc) - timedelta(days=30)
 FROM = FROM.isoformat()[:10]
-UNTIL = datetime.now().isoformat()[:10]
+UNTIL = datetime.now(timezone.utc).isoformat()[:10]
 
 
 class ExportDOI(object):
@@ -136,9 +136,9 @@ def main():
         issns = issns_from_file if issns_from_file else []
 
     if args.date_range:
-        from_date = datetime.now() - timedelta(days=args.date_range)
+        from_date = datetime.now(timezone.utc) - timedelta(days=args.date_range)
         args.from_date = from_date.isoformat()[:10]
-        args.until_date = datetime.now().isoformat()[:10]
+        args.until_date = datetime.now(timezone.utc).isoformat()[:10]
 
     export = ExportDOI(
         args.collection,

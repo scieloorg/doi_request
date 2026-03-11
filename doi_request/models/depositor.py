@@ -1,7 +1,13 @@
-from datetime import datetime
-from doi_request.models import Base
+from datetime import datetime, timezone
+
 from sqlalchemy import func, ForeignKey, Column, Unicode, Integer, String, Boolean, Text, DateTime, Float
 from sqlalchemy.orm import relationship
+
+from doi_request.models import Base
+
+
+def utcnow():
+    return datetime.now(timezone.utc)
 
 
 class Deposit(Base):
@@ -54,7 +60,7 @@ class Deposit(Base):
 class LogEvent(Base):
     __tablename__ = 'logevent'
     id = Column(Integer, primary_key=True)
-    date = Column('date', DateTime(timezone=True), nullable=False, default=datetime.now)
+    date = Column('date', DateTime(timezone=True), nullable=False, default=utcnow)
     title = Column('title', Text, nullable=False)
     body = Column('body', Text, default='')
     type = Column('type', String(16), nullable=False)
@@ -68,6 +74,6 @@ class Expenses(Base):
     id = Column(Integer, primary_key=True)
     retro = Column('retro', Boolean, index=True)
     publication_year = Column('publication_year', Integer, index=True)
-    registry_date = Column('registry_date', DateTime(timezone=True), default=datetime.now)
+    registry_date = Column('registry_date', DateTime(timezone=True), default=utcnow)
     doi = Column('doi', String(128), index=True)
     cost = Column('cost', Float, nullable=False)

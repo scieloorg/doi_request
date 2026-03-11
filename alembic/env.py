@@ -24,8 +24,18 @@ target_metadata = None
 # ... etc.
 
 
+def normalize_sql_engine_url(url):
+    if url.startswith("postgresql://"):
+        return url.replace("postgresql://", "postgresql+psycopg://", 1)
+    if url.startswith("postgres://"):
+        return url.replace("postgres://", "postgresql+psycopg://", 1)
+    return url
+
+
 def get_url():
-    return os.getenv("SQL_ENGINE", "postgresql://user:passeword@postgres:5432/doi_manager")
+    return normalize_sql_engine_url(
+        os.getenv("SQL_ENGINE", "postgresql://user:passeword@postgres:5432/doi_manager")
+    )
 
 
 def run_migrations_offline():

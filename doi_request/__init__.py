@@ -1,14 +1,6 @@
 import os
-from pyramid.config import Configurator
-from pyramid.session import SignedCookieSessionFactory
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-
-from doi_request.models import initialize_sql
-
-
-VERSION = '1.2.0'
+VERSION = '1.5.0'
 
 
 def version(request):
@@ -33,12 +25,22 @@ def db(request):
 def main(global_config, **settings):
     """ This function returns a Pyramid WSGI application.
     """
+    from pyramid.config import Configurator
+    from pyramid.session import SignedCookieSessionFactory
+
+    from doi_request.models import (
+        create_engine_from_env,
+        create_session_factory,
+        initialize_sql,
+    )
+
     config = Configurator(settings=settings)
 
     # Database Config
-    engine = create_engine(os.environ.get('SQL_ENGINE', 'sqlite:///:memory:'))
+    engine = create_engine_from_env()
     static_assets = os.environ.get('STATIC_MEDIA', 'media')
-    config.registry.dbmaker = sessionmaker(bind=engine)
+    config.registry.engine = engine
+    config.registry.dbmaker = create_session_factory(engine)
     config.scan('doi_request.models')  # the "important" line
     initialize_sql(engine)
     config.add_request_method(db, reify=True)
