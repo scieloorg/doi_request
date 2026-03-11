@@ -85,8 +85,29 @@ class User(Base):
     username = Column('username', String(64), unique=True, nullable=False, index=True)
     password_hash = Column('password_hash', String(255), nullable=False)
     is_active = Column('is_active', Boolean, nullable=False, default=True, index=True)
+    is_admin = Column('is_admin', Boolean, nullable=False, default=False, index=True)
     created_at = Column('created_at', DateTime(timezone=True), nullable=False, default=utcnow)
     updated_at = Column('updated_at', DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow)
+    audit_logs = relationship('AuditLog', back_populates='actor_user')
 
     def __repr__(self):
-        return 'User(username="%s", is_active=%s)' % (self.username, self.is_active)
+        return 'User(username="%s", is_active=%s, is_admin=%s)' % (
+            self.username,
+            self.is_active,
+            self.is_admin,
+        )
+
+
+class AuditLog(Base):
+    __tablename__ = 'audit_log'
+    id = Column(Integer, primary_key=True)
+    actor_user_id = Column('actor_user_id', ForeignKey('user_account.id'), index=True)
+    actor_username = Column('actor_username', String(64), index=True)
+    action = Column('action', String(64), nullable=False, index=True)
+    target_type = Column('target_type', String(64), index=True)
+    target_id = Column('target_id', String(64), index=True)
+    target_label = Column('target_label', String(255))
+    details = Column('details', Text, default='')
+    created_at = Column('created_at', DateTime(timezone=True), nullable=False, default=utcnow, index=True)
+
+    actor_user = relationship('User', back_populates='audit_logs')

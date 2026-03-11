@@ -29,6 +29,11 @@
             </div>
             <div class="collapse navbar-collapse pull-left" id="navbar-collapse">
               <ul class="nav navbar-nav">
+                <li class="${'active' if navbar_active == 'dashboard' else ''}">
+                  <a href="${request.route_url('dashboard')}">
+                    <i class="fa fa-dashboard"></i> <span> ${_(u'Dashboard')}</span>
+                  </a>
+                </li>
                 <li class="${'active' if navbar_active == 'deposits' else ''}">
                   <a href="${request.route_url('list_deposits')}">
                     <i class="fa fa-cloud"></i> <span> ${_(u'Depósitos')}</span>
@@ -59,9 +64,14 @@
             <div class="navbar-custom-menu">
               <ul class="nav navbar-nav">
                 <li>
+                  <a href="${request.route_url('profile')}">
+                    <i class="fa fa-user"></i>
+                    <span>${current_user.username if current_user else ''}</span>
+                  </a>
+                </li>
+                <li>
                   <a href="${request.route_url('logout')}">
                     <i class="fa fa-sign-out"></i>
-                    <span>${current_user.username if current_user else ''}</span>
                   </a>
                 </li>
                 <li class="dropdown messages-menu">
@@ -94,6 +104,9 @@
       <div class="content-wrapper">
           <!-- Main content -->
           <section class="content">
+            % for level, message in flash_messages:
+              <div class="alert alert-${level}">${message}</div>
+            % endfor
             <%block name="central_container" />
           </section>
           <!-- /.content -->

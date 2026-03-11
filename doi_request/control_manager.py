@@ -100,6 +100,11 @@ def base_data_manager(wrapped):
         data['version'] = request.version()
         data['locale'] = request.session['_LOCALE_']
         data['current_user'] = request.current_user
+        data['flash_messages'] = [
+            ('success', message) for message in request.session.pop_flash(queue='success')
+        ] + [
+            ('danger', message) for message in request.session.pop_flash(queue='error')
+        ]
 
         setattr(request, 'data_manager', data)
 

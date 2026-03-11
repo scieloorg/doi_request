@@ -1,12 +1,13 @@
 import base64
 import hashlib
 import hmac
+import json
 import os
 from functools import wraps
 
-from pyramid.httpexceptions import HTTPFound
+from pyramid.httpexceptions import HTTPFound, HTTPForbidden
 
-from doi_request.models.depositor import User
+from doi_request.models.depositor import AuditLog, User
 
 PASSWORD_ITERATIONS = 600000
 PASSWORD_SALT_BYTES = 16
@@ -83,3 +84,40 @@ def require_login(view_callable):
         return view_callable(request, *args, **kwargs)
 
     return wrapped
+
+
+def require_admin(view_callable):
+    @wraps(view_callable)
+    def wrapped(request, *args, **kwargs):
+        if request.current_user is None:
+            login_url = request.route_url('login', _query={'next': request.path_qs or request.path})
+            return HTTPFound(location=login_url)
+        if not request.current_user.is_admin:
+            raise HTTPForbidden()
+        return view_callable(request, *args, **kwargs)
+
+    return wrapped
+
+
+def record_audit_action(
+    request,
+    action,
+    target_type='',
+    target_id='',
+    target_label='',
+    details=None,
+    actor_user=None,
+):
+    actor_user = actor_user or request.current_user
+    payload = '' if details is None else json.dumps(details, ensure_ascii=True, sort_keys=True)
+    audit_log = AuditLog(
+        actor_user=actor_user,
+        actor_username=actor_user.username if actor_user else '',
+        action=action,
+        target_type=target_type or '',
+        target_id=str(target_id or ''),
+        target_label=target_label or '',
+        details=payload,
+    )
+    request.db.add(audit_log)
+    return audit_log

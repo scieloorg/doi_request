@@ -10,7 +10,7 @@ import pyramid.httpexceptions as exc
 from sqlalchemy import desc, func, or_, and_, asc
 
 from doi_request.models.depositor import Deposit, Expenses
-from doi_request.auth import require_login
+from doi_request.auth import record_audit_action, require_login
 from doi_request import template_choices
 from doi_request import controller
 from doi_request.control_manager import check_session
@@ -247,8 +247,16 @@ def deposit_post(request):
 
     pids = request.POST.get('pids', '')
     pids += '\r'+request.GET.get('pids', '')
+    normalized_pids = [i.strip() for i in pids.split('\r') if i and i.strip()]
 
-    depositor.deposit_by_pids(['_'.join([os.environ['COLLECTION_ACRONYM'], i.strip()]) for i in pids.split('\r') if i])
+    depositor.deposit_by_pids(['_'.join([os.environ['COLLECTION_ACRONYM'], pid]) for pid in normalized_pids])
+    record_audit_action(
+        request,
+        'deposit_requested',
+        target_type='deposit',
+        target_label=', '.join(normalized_pids[:5]),
+        details={'pid_count': len(normalized_pids)},
+    )
 
     return HTTPFound('/')
 

@@ -29,12 +29,14 @@ def main(argv=None):
                 username=args.username,
                 password_hash=hash_password(args.password),
                 is_active=True,
+                is_admin=True,
             )
             session.add(user)
             print('created user %s' % args.username)
             return 0
 
         user.password_hash = hash_password(args.password)
+        user.is_admin = True
         if args.activate:
             user.is_active = True
         print('updated user %s' % args.username)
