@@ -14,6 +14,8 @@ install_requires = [
     'waitress',
     'articlemetaapi',
     'lxml',
+    'elementpath==2.0.3',
+    'xmlschema==1.2.5',
     'celery[redis]',
     'SQLAlchemy',
     'psycopg2',
