@@ -10,6 +10,8 @@ idna==2.7
 kombu==4.2.1
 legendarium==2.0.2
 lxml==4.2.3
+elementpath==2.0.3
+xmlschema==1.2.5
 Mako==1.0.7
 MarkupSafe==1.0
 PasteDeploy==1.5.2
