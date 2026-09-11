@@ -8,6 +8,7 @@ from celery import Celery
 from celery import Task, chain
 from celery.utils.log import get_task_logger
 from lxml import etree
+import xmlschema
 from articlemeta.client import ThriftClient, ServerError
 
 from crossref.client import CrossrefClient
@@ -50,7 +51,14 @@ REGISTER_DOI_DELAY_RETRY = int(os.environ.get('REGISTER_DOI_DELAY_RETRY', '600')
 REQUEST_DOI_DELAY_RETRY_TD = timedelta(seconds=REQUEST_DOI_DELAY_RETRY)
 REGISTER_DOI_DELAY_RETRY_TD = timedelta(seconds=REGISTER_DOI_DELAY_RETRY)
 SUGGEST_DOI_IDENTIFICATION = asbool(os.environ.get('SUGGEST_DOI_IDENTIFICATION', False))
-CROSSREF_XSD = open(os.path.dirname(__file__)+'/../xsd/crossref4.4.0.xsd')
+CROSSREF_SCHEMA_VERSION = '5.5.0'
+CROSSREF_SCHEMA_NAMESPACE = (
+    'http://www.crossref.org/schema/%s' % CROSSREF_SCHEMA_VERSION
+)
+CROSSREF_XSD_PATH = os.path.abspath(os.path.join(
+    os.path.dirname(__file__), '..', 'xsd',
+    'crossref%s.xsd' % CROSSREF_SCHEMA_VERSION
+))
 CROSSREF_PREFIX = os.environ.get('CROSSREF_PREFIX', None)
 CROSSREF_API_USER = os.environ.get('CROSSREF_API_USER', None)
 CROSSREF_API_PASSWORD = os.environ.get('CROSSREF_API_PASSWORD', None)
@@ -64,19 +72,112 @@ crossref_client = CrossrefClient(
 
 
 def _parse_schema():
-
     try:
-        sch_doc = etree.parse(CROSSREF_XSD)
-        sch = etree.XMLSchema(sch_doc)
-    except Exception as e:
-        logger.exception(e)
-        logger.error('Fail to parse XML')
-        return False
-
-    return sch
+        return xmlschema.XMLSchema11(CROSSREF_XSD_PATH)
+    except Exception:
+        logger.exception(
+            'Fail to parse Crossref schema at "%s"', CROSSREF_XSD_PATH
+        )
+        raise
 
 
 PARSED_SCHEMA = _parse_schema()
+
+
+def _crossref_tag(name):
+    return '{%s}%s' % (CROSSREF_SCHEMA_NAMESPACE, name)
+
+
+def _required_element(xml_doc, path):
+    element = xml_doc.find(path)
+    if element is None:
+        raise ValueError(
+            'Required Crossref 5.5.0 element not found: %s' % path
+        )
+    return element
+
+
+def setup_depositor(xml_doc, doi, depositor_name=None, depositor_email=None):
+    depositor_name = depositor_name or CROSSREF_DEPOSITOR_NAME
+    depositor_email = depositor_email or CROSSREF_DEPOSITOR_EMAIL
+
+    _required_element(
+        xml_doc, './/' + _crossref_tag('registrant')
+    ).text = depositor_name
+    _required_element(
+        xml_doc, './/' + _crossref_tag('depositor_name')
+    ).text = depositor_name
+    _required_element(
+        xml_doc, './/' + _crossref_tag('email_address')
+    ).text = depositor_email
+    _required_element(
+        xml_doc,
+        './/%s/%s' % (_crossref_tag('doi_data'), _crossref_tag('doi'))
+    ).text = doi
+
+    return xml_doc
+
+
+def get_doi_batch_id(xml_doc):
+    return _required_element(
+        xml_doc, './/' + _crossref_tag('doi_batch_id')
+    ).text
+
+
+def serialize_xml(xml_doc):
+    return etree.tostring(
+        xml_doc,
+        encoding='utf-8',
+        pretty_print=True,
+        xml_declaration=True
+    ).decode('utf-8')
+
+
+def xml_is_valid(xml, doi, only_front=False, schema=None,
+                 depositor_name=None, depositor_email=None):
+    if isinstance(xml, str):
+        xml = xml.encode('utf-8')
+
+    try:
+        xml_doc = etree.parse(BytesIO(xml))
+        logger.debug('XML is well formed')
+    except Exception as exc:
+        logger.exception(exc)
+        logger.error('Fail to parse XML')
+        return (False, None, str(exc))
+
+    try:
+        setup_depositor(
+            xml_doc,
+            doi,
+            depositor_name=depositor_name,
+            depositor_email=depositor_email
+        )
+    except ValueError as exc:
+        logger.error(str(exc))
+        return (False, xml_doc, str(exc))
+
+    if only_front:
+        citation_list = xml_doc.find(
+            './/' + _crossref_tag('citation_list')
+        )
+        if citation_list is not None:
+            citation_list.getparent().remove(citation_list)
+
+    xml_doc_pprint = etree.tostring(xml_doc, pretty_print=True)
+    xml_doc = etree.parse(BytesIO(xml_doc_pprint))
+    validation_schema = schema or PARSED_SCHEMA
+    errors = list(validation_schema.iter_errors(
+        xml_doc_pprint.decode('utf-8')
+    ))
+
+    if errors:
+        error_message = '\n'.join(str(error) for error in errors)
+        logger.error('Crossref XML is invalid: %s', error_message)
+        return (False, xml_doc, error_message)
+
+    logger.debug('XML is valid')
+    return (True, xml_doc, '')
 
 
 def log_call(f):
@@ -187,50 +288,11 @@ def prepare_document(self, code):
     with transactional_session() as session:
         deposit = session.query(Deposit).filter_by(code=code).first()
 
-        def setup_depositor(xml):
-            registrant = xml.find('//{http://www.crossref.org/schema/4.4.0}registrant')
-            registrant.text = CROSSREF_DEPOSITOR_NAME
-            depositor_name = xml.find('//{http://www.crossref.org/schema/4.4.0}depositor_name')
-            depositor_name.text = CROSSREF_DEPOSITOR_NAME
-            depositor_email = xml.find('//{http://www.crossref.org/schema/4.4.0}email_address')
-            depositor_email.text = CROSSREF_DEPOSITOR_EMAIL
-            doi = xml.find('//{http://www.crossref.org/schema/4.4.0}doi_data/{http://www.crossref.org/schema/4.4.0}doi')
-            doi.text = deposit.doi
-
-            return xml
-
-        def xml_is_valid(xml, only_front=False):
-            xml = BytesIO(xml.encode('utf-8'))
-            try:
-                xml_doc = etree.parse(xml)
-                logger.debug('XML is well formed')
-            except Exception as e:
-                logger.exception(e)
-                logger.error('Fail to parse XML')
-                return (False, '', str(e))
-
-            xml_doc = setup_depositor(xml_doc)
-
-            if only_front:
-                citation_list = xml_doc.find(
-                    '//{http://www.crossref.org/schema/4.4.0}citation_list')
-                if citation_list:
-                    citation_list.getparent().remove(citation_list)
-
-            xml_doc_pprint = etree.tostring(xml_doc, pretty_print=True)
-            xml_doc = etree.parse(BytesIO(xml_doc_pprint))
-
-            try:
-                result = PARSED_SCHEMA.assertValid(xml_doc)
-                logger.debug('XML is valid')
-                return (True, xml_doc, '')
-            except etree.DocumentInvalid as e:
-                logger.exception(e)
-                logger.error('Fail to parse XML')
-                return (False, xml_doc, str(e))
-
-        is_valid, parsed_xml, exc = xml_is_valid(deposit.submission_xml)
-        deposit.submission_xml = etree.tostring(parsed_xml, encoding='utf-8', pretty_print=True, xml_declaration=True).decode('utf-8')
+        is_valid, parsed_xml, exc = xml_is_valid(
+            deposit.submission_xml, deposit.doi
+        )
+        if parsed_xml is not None:
+            deposit.submission_xml = serialize_xml(parsed_xml)
 
         if is_valid is True:
             log_title = 'XML is valid, it will be submitted to Crossref'
@@ -240,8 +302,7 @@ def prepare_document(self, code):
             deposit.has_submission_xml_valid_references = True
             deposit.submission_status = 'waiting'
             deposit.submission_updated_at = now
-            deposit.doi_batch_id = parsed_xml.find(
-                '//{http://www.crossref.org/schema/4.4.0}doi_batch_id').text
+            deposit.doi_batch_id = get_doi_batch_id(parsed_xml)
 
             log_event(session, {'title': log_title, 'type': 'submission', 'status': 'success', 'deposit_code': code})
             return code
@@ -256,26 +317,28 @@ def prepare_document(self, code):
 
         log_event(session, {'title': log_title, 'body': str(exc), 'type': 'submission', 'status': 'error', 'deposit_code': code})
 
-        log_title = 'Trying to send XML without references'
-        now = datetime.now()
-        logger.debug(log_title)
+        if parsed_xml is None:
+            log_title = 'XML is not well formed for document (%s)' % code
+            log_event(session, {'title': log_title, 'body': str(exc), 'type': 'submission', 'status': 'error', 'deposit_code': code})
+        else:
+            log_title = 'Trying to send XML without references'
+            logger.debug(log_title)
+            log_event(session, {'title': log_title, 'type': 'submission', 'status': 'info', 'deposit_code': code})
 
-        log_event(session, {'title': log_title, 'type': 'submission', 'status': 'info', 'deposit_code': code})
+            is_valid, parsed_xml, exc = xml_is_valid(
+                deposit.submission_xml, deposit.doi, only_front=True
+            )
+            if parsed_xml is not None:
+                deposit.submission_xml = serialize_xml(parsed_xml)
 
-        is_valid, parsed_xml, exc = xml_is_valid(
-            deposit.submission_xml, only_front=True
-        )
-        deposit.submission_xml = etree.tostring(parsed_xml, encoding='utf-8', pretty_print=True, xml_declaration=True).decode('utf-8')
-
-        if is_valid is True:
+        if parsed_xml is not None and is_valid is True:
             log_title = 'XML only with front metadata is valid, it will be submitted to Crossref'
             now = datetime.now()
             logger.info(log_title)
             deposit.is_xml_valid = True
             deposit.submission_status = 'waiting'
             deposit.submission_updated_at = now
-            deposit.doi_batch_id = parsed_xml.find(
-                '//{http://www.crossref.org/schema/4.4.0}doi_batch_id').text
+            deposit.doi_batch_id = get_doi_batch_id(parsed_xml)
 
             log_event(session, {'title': log_title, 'type': 'submission', 'status': 'success', 'deposit_code': code})
 
