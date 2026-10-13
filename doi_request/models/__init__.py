@@ -8,6 +8,8 @@ from sqlalchemy import create_engine
 DBSession = scoped_session(sessionmaker())
 Base = declarative_base()
 
+from doi_request.models.reprocess import ReprocessJob, ReprocessLog  # noqa: F401, E402
+
 
 def create_engine_from_env():
     return create_engine(os.environ.get('SQL_ENGINE', 'sqlite:///:memory:'))
@@ -36,4 +38,3 @@ def transactional_session():
         raise
     finally:
         session.close()
-

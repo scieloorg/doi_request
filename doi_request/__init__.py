@@ -55,6 +55,8 @@ def main(global_config, **settings):
     config.add_route('deposit_post', '/deposit/post')
     config.add_route('deposit', '/deposit')
     config.add_route('downloads', '/downloads')
+    config.add_route('reprocess', '/reprocess')
+    config.add_route('reprocess_submit', '/reprocess/submit')
 
     config.add_subscriber('doi_request.subscribers.add_renderer_globals',
                           'pyramid.events.BeforeRender')
