@@ -532,6 +532,7 @@ def prepare_document(self, code):
             deposit.submission_xml, deposit.doi
         )
         if parsed_xml is not None:
+            relations.set_batch_head(parsed_xml, datetime.utcnow())
             deposit.submission_xml = serialize_xml(parsed_xml)
 
         if is_valid is True:
