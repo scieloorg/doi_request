@@ -8,10 +8,12 @@ from celery import Celery
 from celery import Task, chain
 from celery.utils.log import get_task_logger
 from lxml import etree
+import requests
 import xmlschema
 from articlemeta.client import ThriftClient, ServerError
-
-from crossref.client import CrossrefClient
+from crossref import relations
+from crossref.client import (
+    API_URL, DEPOSIT_URL, CrossrefClient, CrossrefLookupError)
 from doi_request.models.depositor import Deposit, LogEvent, Expenses
 from doi_request.models import transactional_session
 from utils.settings import asbool
@@ -44,10 +46,20 @@ class ChainAborted(Exception):
     pass
 
 
+class RelatedDocumentNotFound(Exception):
+    pass
+
+
+class RelationCycleError(Exception):
+    pass
+
+
 REQUEST_DOI_MAX_RETRY = int(os.environ.get('REQUEST_DOI_MAX_RETRY', '20000'))
 REGISTER_DOI_MAX_RETRY = int(os.environ.get('REGISTER_DOI_MAX_RETRY', '20000'))
 REQUEST_DOI_DELAY_RETRY = int(os.environ.get('REQUEST_DOI_DELAY_RETRY', '600'))
 REGISTER_DOI_DELAY_RETRY = int(os.environ.get('REGISTER_DOI_DELAY_RETRY', '600'))
+RELATIONS_MAX_RETRY = REQUEST_DOI_MAX_RETRY
+RELATIONS_DELAY_RETRY = REQUEST_DOI_DELAY_RETRY
 REQUEST_DOI_DELAY_RETRY_TD = timedelta(seconds=REQUEST_DOI_DELAY_RETRY)
 REGISTER_DOI_DELAY_RETRY_TD = timedelta(seconds=REGISTER_DOI_DELAY_RETRY)
 SUGGEST_DOI_IDENTIFICATION = asbool(os.environ.get('SUGGEST_DOI_IDENTIFICATION', False))
@@ -64,11 +76,14 @@ CROSSREF_API_USER = os.environ.get('CROSSREF_API_USER', None)
 CROSSREF_API_PASSWORD = os.environ.get('CROSSREF_API_PASSWORD', None)
 CROSSREF_DEPOSITOR_NAME = os.environ.get('CROSSREF_DEPOSITOR_NAME', None)
 CROSSREF_DEPOSITOR_EMAIL = os.environ.get('CROSSREF_DEPOSITOR_EMAIL', None)
+CROSSREF_DEPOSIT_URL = os.environ.get('CROSSREF_DEPOSIT_URL') or DEPOSIT_URL
+CROSSREF_API_URL = os.environ.get('CROSSREF_API_URL') or API_URL
 ARTICLEMETA_THRIFTSERVER = os.environ.get(
     'ARTICLEMETA_THRIFTSERVER', 'articlemeta.scielo.org:11621')
 
 crossref_client = CrossrefClient(
-    CROSSREF_PREFIX, CROSSREF_API_USER, CROSSREF_API_PASSWORD)
+    CROSSREF_PREFIX, CROSSREF_API_USER, CROSSREF_API_PASSWORD,
+    deposit_url=CROSSREF_DEPOSIT_URL, api_url=CROSSREF_API_URL)
 
 
 def _parse_schema():
@@ -275,6 +290,193 @@ def load_xml_from_articlemeta(self, code):
 
     if exc_log_title:
         raise self.retry(exc=ComunicationError(exc_log_title))
+
+    return code
+
+
+def parse_xml(xml):
+    return etree.parse(BytesIO(xml.encode('utf-8')))
+
+
+def log_relation_event(session, code, title, status, body=''):
+    log_event(session, {'title': title, 'body': body, 'type': 'relation', 'status': status, 'deposit_code': code})
+
+
+def describe_relation(relation):
+    return '%s --%s--> %s [%s]' % (
+        relation.source_doi,
+        relation.relationship_type,
+        relation.target_doi,
+        relation.element,
+    )
+
+
+def log_found_relations(session, deposit, found_relations):
+    count = len(found_relations)
+    log_relation_event(
+        session, deposit.code,
+        'Found %d related DOI relation%s in the document' % (
+            count, '' if count == 1 else 's'),
+        'info')
+    for relation in found_relations:
+        log_relation_event(
+            session, deposit.code,
+            'Relation found: %s' % describe_relation(relation),
+            'info')
+
+
+def check_targets_in_crossref(session, deposit, found_relations):
+    """Consulta cada DOI alvo uma vez e mantém o resultado somente em memória."""
+    registered_targets = {}
+    for target_doi in sorted(set(
+            relation.target_doi for relation in found_relations)):
+        registered = crossref_client.is_doi_registered(target_doi)
+        registered_targets[target_doi] = registered
+        log_relation_event(
+            session, deposit.code,
+            'Related DOI %s is %s in Crossref' % (
+                target_doi, 'registered' if registered else 'not registered'),
+            'info')
+    return registered_targets
+
+
+def is_blocked_by(principal, dois):
+    if principal.submission_status != 'blocked' or not principal.submission_xml:
+        return False
+    xml_doc = parse_xml(principal.submission_xml)
+    principal_dois = set(relations.submission_dois(xml_doc))
+    return any(
+        relations.relation_role(relation, principal_dois) == relations.BLOCKING
+        and relation.target_doi in dois
+        for relation in relations.extract_doi_relations(xml_doc))
+
+
+def block_deposit(session, deposit, own_dois, blocking_targets, articlemeta):
+    """Bloqueia o depósito e localiza os depósitos principais de que depende.
+
+    Retorna os PIDs dos principais que precisam ser enfileirados e a falha que
+    impede o desbloqueio futuro, quando houver.
+    """
+    code = deposit.code
+    now = datetime.now()
+    deposit.submission_status = 'blocked'
+    deposit.submission_updated_at = now
+    deposit.updated_at = now
+    log_title = 'Deposit blocked until related DOIs are registered in Crossref (%s)' % code
+    logger.info(log_title)
+    log_relation_event(session, code, log_title, 'info', '\n'.join(blocking_targets))
+
+    principals_to_enqueue = []
+    failure = None
+
+    for target_doi in blocking_targets:
+        principal = session.query(Deposit).filter_by(doi=target_doi).first()
+
+        if principal is None:
+            document = articlemeta.document(
+                target_doi.upper(), deposit.collection_acronym)
+            if document is None:
+                failure = RelatedDocumentNotFound(
+                    'Related DOI (%s) not found in ArticleMeta for (%s)' % (target_doi, code))
+                break
+            principals_to_enqueue.append(document.publisher_id)
+            log_relation_event(
+                session, code,
+                'Principal document (%s) for related DOI (%s) enqueued for registration' % (
+                    document.publisher_id, target_doi),
+                'info')
+
+        elif is_blocked_by(principal, own_dois):
+            failure = RelationCycleError(
+                'Deposits (%s) and (%s) are blocked waiting for each other' % (
+                    code, principal.code))
+            break
+
+        else:
+            log_relation_event(
+                session, code,
+                'Principal deposit (%s) for related DOI (%s) already exists' % (
+                    principal.code, target_doi),
+                'info',
+                'submission status: %s, feedback status: %s' % (
+                    principal.submission_status, principal.feedback_status))
+
+    if failure is not None:
+        deposit.submission_status = 'error'
+        logger.error(str(failure))
+        log_relation_event(session, code, str(failure), 'error')
+
+    return principals_to_enqueue, failure
+
+
+def unregistered_blocking_targets(found_relations, own_dois, registered_targets):
+    """DOIs bloqueantes que ainda não estão registrados no Crossref."""
+    targets = set()
+    for relation in found_relations:
+        role = relations.relation_role(relation, own_dois)
+        target_doi = relation.target_doi
+        is_blocking = role == relations.BLOCKING
+        is_registered = registered_targets[target_doi]
+        if is_blocking and not is_registered:
+            targets.add(target_doi)
+    return sorted(targets)
+
+
+@app.task(bind=True, max_retries=RELATIONS_MAX_RETRY,
+          autoretry_for=(ServerError, CrossrefLookupError, requests.RequestException),
+          throws=(RelatedDocumentNotFound, RelationCycleError))
+@log_call
+def resolve_relations(self, code):
+    """Decide se o depósito pode seguir para o Crossref e o que vai no primeiro envio.
+
+    Roda depois de ``load_xml_from_articlemeta`` e antes de ``prepare_document``.
+    Lê as relações por DOI de ``submission_xml`` e consulta o Crossref. Todo
+    estado das relações fica em variáveis locais e é recalculado nos retries.
+
+    Há dois desfechos:
+
+    - Algum alvo bloqueante ainda não está registrado (tradução, comentário,
+      resposta, revisão, preprint ou errata). O depósito fica ``blocked``, os
+      documentos principais sem depósito são enfileirados e esta tarefa tenta
+      novamente até os DOIs aparecerem no Crossref.
+    ``CrossrefLookupError`` e falhas de rede são retentadas. ``ServerError`` do
+    ArticleMeta também. ``RelatedDocumentNotFound`` e ``RelationCycleError``
+    marcam o depósito como ``error`` e encerram a cadeia sem nova tentativa.
+
+    Reprocessar não depende de estado persistido fora das colunas históricas.
+    """
+    articlemeta = ThriftClient(domain=ARTICLEMETA_THRIFTSERVER)
+    principals_to_enqueue = []
+    failure = None
+
+    with transactional_session() as session:
+        deposit = session.query(Deposit).filter_by(code=code).first()
+        collection = deposit.collection_acronym
+        xml_doc = parse_xml(deposit.submission_xml)
+        own_dois = set(relations.submission_dois(xml_doc))
+        found_relations = relations.extract_doi_relations(xml_doc)
+        log_found_relations(session, deposit, found_relations)
+        registered_targets = check_targets_in_crossref(
+            session, deposit, found_relations)
+
+        blocking_targets = unregistered_blocking_targets(
+            found_relations, own_dois, registered_targets)
+
+        if blocking_targets:
+            principals_to_enqueue, failure = block_deposit(
+                session, deposit, own_dois, blocking_targets, articlemeta)
+        else:
+            deposit.submission_status = 'waiting'
+
+    if failure is not None:
+        raise failure
+
+    if blocking_targets:
+        for pid in principals_to_enqueue:
+            registry_dispatcher_document_skip_deposited.delay(pid, collection)
+        raise self.retry(
+            exc=ChainAborted('Deposit blocked by related DOIs: %s' % code),
+            countdown=RELATIONS_DELAY_RETRY)
 
     return code
 
@@ -560,6 +762,8 @@ def register_expenses(session, deposit):
     expenses.cost = 0.15 if int(deposit.publication_year) < back_file_limit else 1
     expenses.retro = True if int(deposit.publication_year) < back_file_limit else False
     session.add(expenses)
+
+
 @app.task(bind=True, throws=(ChainAborted,), task_time_limit=60, 
         autoretry_for=(ServerError,), retry_backoff=True)
 @log_call
@@ -630,7 +834,7 @@ def _registry_dispatcher_document(code, collection, skip_deposited):
                 logger.info('deposit already exists. it will be deleted and '
                             're-created: "%s"', code)
                 session.delete(deposit)
-        
+
         session.add(depitem)
 
     logger.info('deposit successfuly created for "%s": %s', code,
@@ -639,6 +843,7 @@ def _registry_dispatcher_document(code, collection, skip_deposited):
     chain(
         triage_deposit.s(code).set(queue='dispatcher'),
         load_xml_from_articlemeta.s().set(queue='dispatcher'),
+        resolve_relations.s().set(queue='dispatcher'),
         prepare_document.s().set(queue='dispatcher'),
         register_doi.s().set(queue='dispatcher'),
         request_doi_status.s().set(queue='releaser')
