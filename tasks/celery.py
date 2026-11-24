@@ -936,8 +936,15 @@ def _registry_dispatcher_document(code, collection, skip_deposited):
         publication_year=int(document.publication_date[0:4]),
         prefix=doi_prefix,
         has_submission_xml_valid_references=False,
+        submission_xml='',
         submission_updated_at=now,
         submission_status='waiting',
+        submission_response='',
+        doi_batch_id=None,
+        feedback_status=None,
+        feedback_xml='',
+        feedback_updated_at=None,
+        is_xml_valid=False,
         updated_at=now,
         started_at=now
     )
@@ -952,6 +959,7 @@ def _registry_dispatcher_document(code, collection, skip_deposited):
                 logger.info('deposit already exists. it will be deleted and '
                             're-created: "%s"', code)
                 session.delete(deposit)
+                session.flush()
 
         session.add(depitem)
 
