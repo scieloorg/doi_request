@@ -510,8 +510,7 @@ def request_doi_status(self, code):
                 exc_class, exc_log_title = (UnkownSubmission, log_title)
 
             else:
-                feedback_status = xml_doc.find('.//record_diagnostic').get('status').lower() or 'unkown'
-                feedback_body = xml_doc.find('.//record_diagnostic/msg').text or ''
+                feedback_status, feedback_body = batch_feedback(xml_doc)
                 log_title = 'Crossref final status for (%s) is (%s)' % (deposit.doi_batch_id, feedback_status)
                 logger.info(log_title)
                 now = datetime.now()
@@ -523,20 +522,44 @@ def request_doi_status(self, code):
                 log_event(session, {'title': log_title, 'body': feedback_body, 'type': 'feedback', 'status': feedback_status, 'deposit_code': code})
 
                 if feedback_status == 'success' and 'added' in feedback_body.lower():
-                    #crossref backfiles limit current year - 2.
-                    back_file_limit = int(datetime.now().strftime('%Y')) - 2
-                    expenses = Expenses()
-                    expenses.publication_year = deposit.publication_year
-                    expenses.registry_date = datetime.now()
-                    expenses.doi = deposit.doi
-                    expenses.cost = 0.15 if int(deposit.publication_year) < back_file_limit else 1
-                    expenses.retro = True if int(deposit.publication_year) < back_file_limit else False
-                    session.add(expenses)
+                    register_expenses(session, deposit)
 
     if exc_class:
         raise self.retry(exc=exc_class(exc_log_title))
 
 
+def batch_feedback(xml_doc):
+    """Resume o resultado de todos os registros do lote (um por DOI).
+
+    O lote só é considerado ``success`` quando todos os registros são.
+    """
+    diagnostics = xml_doc.findall('.//record_diagnostic')
+    if not diagnostics:
+        raise ValueError('Crossref batch result without record_diagnostic')
+
+    statuses = [diagnostic.get('status').lower() for diagnostic in diagnostics]
+    failures = [status for status in statuses if status != 'success']
+    body = '\n'.join(
+        '%s: %s' % (diagnostic.findtext('doi'), diagnostic.findtext('msg'))
+        for diagnostic in diagnostics)
+
+    return (failures[0] if failures else 'success'), body
+
+
+def register_expenses(session, deposit):
+    if session.query(Expenses).filter_by(doi=deposit.doi).first() is not None:
+        log_event(session, {'title': 'Expenses already registered for DOI (%s)' % deposit.doi, 'type': 'feedback', 'status': 'info', 'deposit_code': deposit.code})
+        return
+
+    #crossref backfiles limit current year - 2.
+    back_file_limit = int(datetime.now().strftime('%Y')) - 2
+    expenses = Expenses()
+    expenses.publication_year = deposit.publication_year
+    expenses.registry_date = datetime.now()
+    expenses.doi = deposit.doi
+    expenses.cost = 0.15 if int(deposit.publication_year) < back_file_limit else 1
+    expenses.retro = True if int(deposit.publication_year) < back_file_limit else False
+    session.add(expenses)
 @app.task(bind=True, throws=(ChainAborted,), task_time_limit=60, 
         autoretry_for=(ServerError,), retry_backoff=True)
 @log_call
