@@ -607,15 +607,19 @@ def register_doi(self, code):
     with transactional_session() as session:
         deposit = session.query(Deposit).filter_by(code=code).first()
 
-        log_title = 'Sending XML to Crossref'
+        log_title = 'Sending DOI %s to Crossref (batch %s)' % (
+            deposit.doi, deposit.doi_batch_id)
         log_event(session, {'title': log_title, 'type': 'submission', 'status': 'info', 'deposit_code': code})
 
         try:
             result = crossref_client.register_doi(code, deposit.submission_xml)
         except Exception as exc:
-            log_title = 'Fail to Connect to Crossref API, retrying at (%s) to submit (%s)' % (
-                datetime.now()+REGISTER_DOI_DELAY_RETRY_TD, code
-            )
+            log_title = (
+                'Could not send DOI %s to Crossref API; retrying at %s '
+                '(batch %s)' % (
+                    deposit.doi,
+                    datetime.now() + REGISTER_DOI_DELAY_RETRY_TD,
+                    deposit.doi_batch_id))
             logger.error(log_title)
 
             now = datetime.now()
@@ -628,9 +632,13 @@ def register_doi(self, code):
         else:
 
             if result.status_code != 200:
-                log_title = 'Fail to Connect to Crossref API, retrying at (%s) to submit (%s)' % (
-                    datetime.now()+REGISTER_DOI_DELAY_RETRY_TD, code
-                )
+                log_title = (
+                    'Crossref API returned HTTP %d for DOI %s; retrying at %s '
+                    '(batch %s)' % (
+                        result.status_code,
+                        deposit.doi,
+                        datetime.now() + REGISTER_DOI_DELAY_RETRY_TD,
+                        deposit.doi_batch_id))
                 logger.error(log_title)
                 now = datetime.now()
                 deposit.submission_log = log_title
@@ -642,7 +650,8 @@ def register_doi(self, code):
                 exc_class, exc_log_title = (RequestError, log_title)
 
             elif result.status_code == 200 and 'SUCCESS' in result.text:
-                log_title = 'Success sending metadata for (%s)' % code
+                log_title = 'DOI %s sent successfully to Crossref (batch %s)' % (
+                    deposit.doi, deposit.doi_batch_id)
                 logger.debug(log_title)
                 now = datetime.now()
                 deposit.submission_status = 'success'
@@ -653,7 +662,8 @@ def register_doi(self, code):
                 return code
 
             else:
-                log_title = 'Fail registering DOI for (%s)' % code
+                log_title = 'Crossref rejected DOI %s (batch %s)' % (
+                    deposit.doi, deposit.doi_batch_id)
                 now = datetime.now()
                 deposit.submission_status = 'error'
                 deposit.submission_updated_at = now
