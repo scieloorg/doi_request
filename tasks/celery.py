@@ -422,6 +422,28 @@ def unregistered_blocking_targets(found_relations, own_dois, registered_targets)
     return sorted(targets)
 
 
+def unregistered_deferred_targets(found_relations, registered_targets):
+    """DOIs alvo de relações que ainda não estão registrados no Crossref."""
+    targets = set()
+    for relation in found_relations:
+        target_doi = relation.target_doi
+        if not registered_targets[target_doi]:
+            targets.add(target_doi)
+    return targets
+
+
+def strip_deferred_relations(session, deposit, xml_doc, deferred_targets):
+    for relation in relations.strip_relations(xml_doc, deferred_targets):
+        log_relation_event(
+            session, deposit.code,
+            'Relation deferred from the first submission: %s' %
+            describe_relation(relation),
+            'info')
+
+    deposit.submission_xml = serialize_xml(xml_doc)
+    deposit.updated_at = datetime.now()
+
+
 @app.task(bind=True, max_retries=RELATIONS_MAX_RETRY,
           autoretry_for=(ServerError, CrossrefLookupError, requests.RequestException),
           throws=(RelatedDocumentNotFound, RelationCycleError))
@@ -439,6 +461,10 @@ def resolve_relations(self, code):
       resposta, revisão, preprint ou errata). O depósito fica ``blocked``, os
       documentos principais sem depósito são enfileirados e esta tarefa tenta
       novamente até os DOIs aparecerem no Crossref.
+    - Nenhum alvo bloqueante está pendente. As relações adiadas cujo DOI ainda
+      não existe saem de ``submission_xml`` e a cadeia segue. O XML original
+      será obtido novamente do ArticleMeta para o depósito final.
+
     ``CrossrefLookupError`` e falhas de rede são retentadas. ``ServerError`` do
     ArticleMeta também. ``RelatedDocumentNotFound`` e ``RelationCycleError``
     marcam o depósito como ``error`` e encerram a cadeia sem nova tentativa.
@@ -467,6 +493,8 @@ def resolve_relations(self, code):
                 session, deposit, own_dois, blocking_targets, articlemeta)
         else:
             deposit.submission_status = 'waiting'
+            deferref_targets = unregistered_deferred_targets(found_relations, registered_targets)
+            strip_deferred_relations(session, deposit, xml_doc, deferref_targets)
 
     if failure is not None:
         raise failure
