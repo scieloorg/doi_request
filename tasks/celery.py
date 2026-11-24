@@ -444,6 +444,14 @@ def strip_deferred_relations(session, deposit, xml_doc, deferred_targets):
     deposit.updated_at = datetime.now()
 
 
+def submission_chain():
+    return [
+        prepare_document.s().set(queue='dispatcher'),
+        register_doi.s().set(queue='dispatcher'),
+        request_doi_status.s().set(queue='releaser'),
+    ]
+
+
 @app.task(bind=True, max_retries=RELATIONS_MAX_RETRY,
           autoretry_for=(ServerError, CrossrefLookupError, requests.RequestException),
           throws=(RelatedDocumentNotFound, RelationCycleError))
@@ -683,6 +691,7 @@ class CallbackTask(Task):
 @log_call
 def request_doi_status(self, code):
     exc_class, exc_log_title = (None, '')
+    registered = False
 
     with transactional_session() as session:
         deposit = session.query(Deposit).filter_by(code=code).first()
@@ -754,8 +763,13 @@ def request_doi_status(self, code):
                 if feedback_status == 'success' and 'added' in feedback_body.lower():
                     register_expenses(session, deposit)
 
+                registered = feedback_status == 'success'
+
     if exc_class:
         raise self.retry(exc=exc_class(exc_log_title))
+
+    if registered:
+        finalize_relations.apply_async(args=[code], queue='dispatcher')
 
 
 def batch_feedback(xml_doc):
@@ -790,6 +804,81 @@ def register_expenses(session, deposit):
     expenses.cost = 0.15 if int(deposit.publication_year) < back_file_limit else 1
     expenses.retro = True if int(deposit.publication_year) < back_file_limit else False
     session.add(expenses)
+
+
+@app.task(bind=True, max_retries=RELATIONS_MAX_RETRY,
+          autoretry_for=(ServerError, CrossrefLookupError, requests.RequestException),
+          throws=(RelatedDocumentNotFound,))
+@log_call
+def finalize_relations(self, code):
+    """Reavalia relações adiadas e prepara, uma única vez, o XML final.
+
+    O XML original vem novamente do ArticleMeta. A diferença para o XML já
+    submetido e a disponibilidade dos alvos no Crossref são recalculadas sem
+    tabela ou coluna adicional.
+    """
+    articlemeta = ThriftClient(domain=ARTICLEMETA_THRIFTSERVER)
+    retry_targets = []
+    prepared = False
+
+    with transactional_session() as session:
+        deposit = session.query(Deposit).filter_by(code=code).first()
+        if deposit.feedback_status != 'success':
+            return code
+
+        xml = articlemeta.document(
+            deposit.pid, deposit.collection_acronym, fmt='xmlcrossref')
+        if not xml:
+            raise RelatedDocumentNotFound(
+                'Crossref XML not found in ArticleMeta for (%s)' % deposit.code)
+        original_doc = parse_xml(xml)
+        submitted_doc = parse_xml(deposit.submission_xml)
+        original_relations = set(relations.extract_doi_relations(original_doc))
+        submitted_relations = set(relations.extract_doi_relations(submitted_doc))
+        removed_relations = original_relations - submitted_relations
+
+        if not removed_relations:
+            return code
+
+        registered_targets = check_targets_in_crossref(
+            session, deposit, removed_relations)
+        retry_targets = sorted(
+            target for target, registered in registered_targets.items()
+            if not registered)
+
+        if not retry_targets:
+            previous_batch_id = deposit.doi_batch_id
+            now = datetime.now()
+            updated = session.query(Deposit).filter_by(
+                code=code,
+                feedback_status='success',
+                doi_batch_id=previous_batch_id,
+            ).update({
+                'submission_xml': serialize_xml(original_doc),
+                'submission_status': 'waiting',
+                'submission_updated_at': now,
+                'feedback_status': 'waiting',
+                'feedback_updated_at': now,
+                'updated_at': now,
+            }, synchronize_session=False)
+            prepared = bool(updated)
+            if prepared:
+                log_relation_event(
+                    session, code,
+                    'Final submission with all relations prepared',
+                    'info')
+
+    if retry_targets:
+        raise self.retry(
+            exc=ChainAborted(
+                'Final deposit waiting for related DOIs: %s' %
+                ', '.join(retry_targets)),
+            countdown=RELATIONS_DELAY_RETRY)
+
+    if prepared:
+        chain(*submission_chain()).delay(code)
+
+    return code
 
 
 @app.task(bind=True, throws=(ChainAborted,), task_time_limit=60, 
@@ -872,8 +961,6 @@ def _registry_dispatcher_document(code, collection, skip_deposited):
         triage_deposit.s(code).set(queue='dispatcher'),
         load_xml_from_articlemeta.s().set(queue='dispatcher'),
         resolve_relations.s().set(queue='dispatcher'),
-        prepare_document.s().set(queue='dispatcher'),
-        register_doi.s().set(queue='dispatcher'),
-        request_doi_status.s().set(queue='releaser')
+        *submission_chain()
     ).delay()
 

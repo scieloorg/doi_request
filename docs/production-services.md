@@ -48,6 +48,6 @@ Argumentos opcionais:
 
 - Dashboard: interface WEB desta aplicação
 - Celeryworker: responsável por enfileirar as tarefas de depósito no CrossRef
-- Celeryworker-dispacher: responsável por executar as tarefas enfileiradas pelo Celeryworker. Este não recebe o status do depósito de documentos.
+- Celeryworker-dispacher: responsável por executar as tarefas enfileiradas pelo Celeryworker, incluindo a resolução e finalização de relações entre DOIs. Este não recebe o status do depósito de documentos.
 - Celeryworker-releaser: responsável por consultar o status do depósito de documentos no CrossRef.
 - Redis: armazena as filas
