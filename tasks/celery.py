@@ -439,9 +439,11 @@ def strip_deferred_relations(session, deposit, xml_doc, deferred_targets):
             'Relation deferred from the first submission: %s' %
             describe_relation(relation),
             'info')
-
+    now = datetime.now()
+    deposit.submission_status = 'waiting'
+    deposit.submission_updated_at = now
     deposit.submission_xml = serialize_xml(xml_doc)
-    deposit.updated_at = datetime.now()
+    deposit.updated_at = now
 
 
 def submission_chain():
@@ -500,9 +502,8 @@ def resolve_relations(self, code):
             principals_to_enqueue, failure = block_deposit(
                 session, deposit, own_dois, blocking_targets, articlemeta)
         else:
-            deposit.submission_status = 'waiting'
-            deferref_targets = unregistered_deferred_targets(found_relations, registered_targets)
-            strip_deferred_relations(session, deposit, xml_doc, deferref_targets)
+            deferred_targets = unregistered_deferred_targets(found_relations, registered_targets)
+            strip_deferred_relations(session, deposit, xml_doc, deferred_targets)
 
     if failure is not None:
         raise failure
