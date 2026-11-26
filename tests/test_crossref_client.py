@@ -7,7 +7,10 @@ from crossref.client import CrossrefClient, CrossrefLookupError
 class IsDoiRegisteredTest(unittest.TestCase):
 
     def setUp(self):
-        self.client = CrossrefClient('10.1590', 'user', 'password')
+        self.client = CrossrefClient(
+            '10.1590', 'user', 'password',
+            deposit_url='https://doi.crossref.org',
+            api_url='https://api.crossref.org')
 
     @mock.patch('crossref.client.requests.get')
     def test_registered(self, get):
