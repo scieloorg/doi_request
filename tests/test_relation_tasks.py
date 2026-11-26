@@ -11,6 +11,10 @@ from crossref.client import CrossrefLookupError
 from doi_request.models import Base, PlainSession, transactional_session
 from doi_request.models.depositor import Deposit, Expenses, LogEvent
 from tasks import celery
+from tasks.expenses import register_expenses
+from tasks.feedback import batch_feedback
+from tasks.settings import CROSSREF_SCHEMA_NAMESPACE
+from tasks.xml import get_doi_batch_id, serialize_xml
 
 
 FIXTURES_DIR = os.path.join(os.path.dirname(__file__), 'fixtures')
@@ -97,7 +101,7 @@ class LoadXmlFromArticlemetaTest(RelationTaskTestCase):
             BytesIO(deposit.submission_xml.encode('utf-8')))
 
         self.assertEqual(
-            'test-batch-no-refs', celery.get_doi_batch_id(xml_doc))
+            'test-batch-no-refs', get_doi_batch_id(xml_doc))
 
 
 class PrepareDocumentTest(RelationTaskTestCase):
@@ -112,11 +116,11 @@ class PrepareDocumentTest(RelationTaskTestCase):
         xml_doc = etree.parse(
             BytesIO(deposit.submission_xml.encode('utf-8')))
         timestamp = xml_doc.findtext(
-            './/{%s}timestamp' % celery.CROSSREF_SCHEMA_NAMESPACE)
+            './/{%s}timestamp' % CROSSREF_SCHEMA_NAMESPACE)
 
         self.assertEqual('test-batch-no-refs', deposit.doi_batch_id)
         self.assertEqual(
-            deposit.doi_batch_id, celery.get_doi_batch_id(xml_doc))
+            deposit.doi_batch_id, get_doi_batch_id(xml_doc))
         self.assertEqual(17, len(timestamp))
         self.assertTrue(timestamp.isdigit())
         self.assertNotEqual('20260908120001', timestamp)
@@ -280,7 +284,7 @@ class FinalizeRelationsTest(RelationTaskTestCase):
             {'10.1590/translation', '10.1590/original', '10.1590/review'})
         add_deposit(
             'scl_S1', '10.1590/original',
-            celery.serialize_xml(submitted_doc),
+            serialize_xml(submitted_doc),
             feedback_status='success', doi_batch_id='initial-batch')
         self.articlemeta.document.return_value = original
         return original
@@ -337,7 +341,7 @@ class RequestDoiStatusHelpersTest(RelationTaskTestCase):
             '<msg>Relation target not found</msg></record_diagnostic>'
             '</doi_batch_diagnostic>').getroottree()
 
-        status, body = celery.batch_feedback(xml_doc)
+        status, body = batch_feedback(xml_doc)
 
         self.assertEqual('failure', status)
         self.assertEqual(
@@ -348,7 +352,7 @@ class RequestDoiStatusHelpersTest(RelationTaskTestCase):
     def test_batch_feedback_without_records_is_unknown(self):
         xml_doc = etree.fromstring(
             '<doi_batch_diagnostic status="completed"/>').getroottree()
-        status, body = celery.batch_feedback(xml_doc)
+        status, body = batch_feedback(xml_doc)
         self.assertEqual('unknow', status)
         self.assertEqual('', body)
 
@@ -360,7 +364,7 @@ class RequestDoiStatusHelpersTest(RelationTaskTestCase):
             with transactional_session() as session:
                 deposit = session.query(Deposit).filter_by(
                     code='scl_S1').first()
-                celery.register_expenses(session, deposit)
+                register_expenses(session, deposit)
 
         with transactional_session() as session:
             self.assertEqual(
