@@ -236,22 +236,52 @@ class ResolveRelationsTest(RelationTaskTestCase):
 
         self.assertEqual('error', get_deposit('scl_S1').submission_status)
 
-    def test_detects_cycle_from_existing_xml(self):
-        self.is_doi_registered.return_value = False
+    def test_reply_chain_blocks_and_releases_in_dependency_order(self):
+        registered = set()
+        self.is_doi_registered.side_effect = lambda doi: doi in registered
+        self.articlemeta.document.return_value = mock.Mock(publisher_id='S3')
         add_deposit(
-            'scl_S2', '10.1590/principal',
-            doi_xml('10.1590/principal',
-                    related_item_xml('isCommentOn', '10.1590/comment')),
-            submission_status='blocked')
+            'scl_B', '10.1590/b',
+            doi_xml('10.1590/b',
+                    related_item_xml('isReplyTo', '10.1590/c')))
         add_deposit(
-            'scl_S1', '10.1590/comment',
-            doi_xml('10.1590/comment',
-                    related_item_xml('isCommentOn', '10.1590/principal')))
+            'scl_A', '10.1590/a',
+            doi_xml('10.1590/a',
+                    related_item_xml('isReplyTo', '10.1590/b')))
 
-        with self.assertRaises(celery.RelationCycleError):
-            celery.resolve_relations('scl_S1')
+        with self.assertRaises(celery.ChainAborted):
+            celery.resolve_relations('scl_A')
+        with self.assertRaises(celery.ChainAborted):
+            celery.resolve_relations('scl_B')
 
-        self.assertEqual('error', get_deposit('scl_S1').submission_status)
+        self.assertEqual('blocked', get_deposit('scl_A').submission_status)
+        self.assertEqual('blocked', get_deposit('scl_B').submission_status)
+        self.assertEqual(
+            ['10.1590/b'],
+            [relation.target_doi for relation in extracted_relations(
+                get_deposit('scl_A').submission_xml)])
+        self.assertEqual(
+            ['10.1590/c'],
+            [relation.target_doi for relation in extracted_relations(
+                get_deposit('scl_B').submission_xml)])
+        self.articlemeta.document.assert_called_once_with('10.1590/C', 'scl')
+        self.enqueue_principal.assert_called_once_with('S3', 'scl')
+
+        registered.add('10.1590/c')
+        self.assertEqual('scl_B', celery.resolve_relations('scl_B'))
+        self.assertEqual('waiting', get_deposit('scl_B').submission_status)
+
+        registered.add('10.1590/b')
+        self.assertEqual('scl_A', celery.resolve_relations('scl_A'))
+        self.assertEqual('waiting', get_deposit('scl_A').submission_status)
+        self.assertEqual(
+            ['10.1590/b'],
+            [relation.target_doi for relation in extracted_relations(
+                get_deposit('scl_A').submission_xml)])
+        self.assertEqual(
+            ['10.1590/c'],
+            [relation.target_doi for relation in extracted_relations(
+                get_deposit('scl_B').submission_xml)])
 
     def test_crossref_failure_does_not_change_submission_xml(self):
         xml = load_fixture('crossref_5_5_with_relations.xml')

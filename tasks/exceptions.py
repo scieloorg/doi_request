@@ -20,7 +20,3 @@ class ChainAborted(Exception):
 
 class RelatedDocumentNotFound(Exception):
     pass
-
-
-class RelationCycleError(Exception):
-    pass

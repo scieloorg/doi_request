@@ -16,7 +16,6 @@ from tasks.exceptions import (
     ChainAborted,
     ComunicationError,
     RelatedDocumentNotFound,
-    RelationCycleError,
     RequestError,
     UnkownSubmission,
 )
@@ -143,7 +142,7 @@ def submission_chain():
 
 @app.task(bind=True, max_retries=RELATIONS_MAX_RETRY,
           autoretry_for=(ServerError, CrossrefLookupError, requests.RequestException),
-          throws=(RelatedDocumentNotFound, RelationCycleError))
+          throws=(RelatedDocumentNotFound,))
 @log_call
 def resolve_relations(self, code):
     """Decide se o depósito pode seguir para o Crossref e o que vai no primeiro envio.
@@ -163,8 +162,8 @@ def resolve_relations(self, code):
       será obtido novamente do ArticleMeta para o depósito final.
 
     ``CrossrefLookupError`` e falhas de rede são retentadas. ``ServerError`` do
-    ArticleMeta também. ``RelatedDocumentNotFound`` e ``RelationCycleError``
-    marcam o depósito como ``error`` e encerram a cadeia sem nova tentativa.
+    ArticleMeta também. ``RelatedDocumentNotFound`` marca o depósito como
+    ``error`` e encerra a cadeia sem nova tentativa.
 
     Reprocessar não depende de estado persistido fora das colunas históricas.
     """
@@ -187,10 +186,12 @@ def resolve_relations(self, code):
 
         if blocking_targets:
             principals_to_enqueue, failure = block_deposit(
-                session, deposit, own_dois, blocking_targets, articlemeta)
+                session, deposit, blocking_targets, articlemeta)
         else:
-            deferred_targets = unregistered_deferred_targets(found_relations, registered_targets)
-            strip_deferred_relations(session, deposit, xml_doc, deferred_targets)
+            deferred_targets = unregistered_deferred_targets(
+                found_relations, registered_targets)
+            strip_deferred_relations(
+                session, deposit, xml_doc, deferred_targets)
 
     if failure is not None:
         raise failure

@@ -5,10 +5,10 @@ from sqlalchemy import func
 
 from crossref import relations
 from doi_request.models.depositor import Deposit
-from tasks.exceptions import RelatedDocumentNotFound, RelationCycleError
+from tasks.exceptions import RelatedDocumentNotFound
 from tasks.logging import describe_relation, log_relation_event
 from tasks.settings import crossref_client
-from tasks.xml import parse_xml, serialize_xml
+from tasks.xml import serialize_xml
 
 
 logger = logging.getLogger(__name__)
@@ -29,18 +29,7 @@ def check_targets_in_crossref(session, deposit, found_relations):
     return registered_targets
 
 
-def is_blocked_by(principal, dois):
-    if principal.submission_status != 'blocked' or not principal.submission_xml:
-        return False
-    xml_doc = parse_xml(principal.submission_xml)
-    principal_dois = set(relations.submission_dois(xml_doc))
-    return any(
-        relations.relation_role(relation, principal_dois) == relations.BLOCKING
-        and relation.target_doi in dois
-        for relation in relations.extract_doi_relations(xml_doc))
-
-
-def block_deposit(session, deposit, own_dois, blocking_targets, articlemeta):
+def block_deposit(session, deposit, blocking_targets, articlemeta):
     """Bloqueia o depósito e localiza os depósitos principais de que depende.
 
     Retorna os PIDs dos principais que precisam ser enfileirados e a falha que
@@ -53,7 +42,8 @@ def block_deposit(session, deposit, own_dois, blocking_targets, articlemeta):
     deposit.updated_at = now
     log_title = 'Deposit blocked until related DOIs are registered in Crossref (%s)' % code
     logger.info(log_title)
-    log_relation_event(session, code, log_title, 'info', '\n'.join(blocking_targets))
+    log_relation_event(
+        session, code, log_title, 'info', '\n'.join(blocking_targets))
 
     principals_to_enqueue = []
     failure = None
@@ -76,12 +66,6 @@ def block_deposit(session, deposit, own_dois, blocking_targets, articlemeta):
                 'Principal document (%s) for related DOI (%s) enqueued for registration' % (
                     document.publisher_id, target_doi),
                 'info')
-
-        elif is_blocked_by(principal, own_dois):
-            failure = RelationCycleError(
-                'Deposits (%s) and (%s) are blocked waiting for each other' % (
-                    code, principal.code))
-            break
 
         else:
             log_relation_event(
