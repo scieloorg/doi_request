@@ -199,6 +199,26 @@ class ResolveRelationsTest(RelationTaskTestCase):
         self.articlemeta.document.assert_not_called()
         self.enqueue_principal.assert_not_called()
 
+    def test_existing_principal_matches_doi_ignoring_case(self):
+        self.is_doi_registered.return_value = False
+        add_deposit(
+            'scl_S2', '10.1590/S0101-31732024000400434',
+            doi_xml('10.1590/S0101-31732024000400434'))
+        add_deposit(
+            'scl_S1', '10.1590/comment',
+            doi_xml('10.1590/comment', related_item_xml(
+                'isCommentOn', '10.1590/s0101-31732024000400434')))
+
+        with self.assertRaises(celery.ChainAborted):
+            celery.resolve_relations('scl_S1')
+
+        self.articlemeta.document.assert_not_called()
+        self.enqueue_principal.assert_not_called()
+        self.assertIn(
+            'Principal deposit (scl_S2) for related DOI '
+            '(10.1590/s0101-31732024000400434) already exists',
+            event_titles('scl_S1'))
+
     def test_missing_principal_marks_deposit_as_error(self):
         self.is_doi_registered.return_value = False
         self.articlemeta.document.return_value = None

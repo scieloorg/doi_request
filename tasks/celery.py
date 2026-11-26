@@ -10,6 +10,7 @@ from celery.utils.log import get_task_logger
 from lxml import etree
 import requests
 import xmlschema
+from sqlalchemy import func
 from articlemeta.client import ThriftClient, ServerError
 from crossref import relations
 from crossref.client import (
@@ -370,7 +371,9 @@ def block_deposit(session, deposit, own_dois, blocking_targets, articlemeta):
     failure = None
 
     for target_doi in blocking_targets:
-        principal = session.query(Deposit).filter_by(doi=target_doi).first()
+        principal = session.query(Deposit).filter(
+            func.upper(Deposit.doi) == target_doi.upper()
+        ).first()
 
         if principal is None:
             document = articlemeta.document(
