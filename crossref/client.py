@@ -5,9 +5,6 @@ request a DOI number and follow the request status.
 """
 import requests
 
-DEPOSIT_URL = 'https://doi.crossref.org'
-API_URL = 'https://api.crossref.org'
-
 
 class CrossrefLookupError(Exception):
 
@@ -21,8 +18,7 @@ class CrossrefLookupError(Exception):
 
 class CrossrefClient(object):
 
-    def __init__(self, prefix, api_user, api_key, deposit_url=DEPOSIT_URL,
-                 api_url=API_URL):
+    def __init__(self, prefix, api_user, api_key, deposit_url, api_url):
 
         self.prefix = prefix
         self.api_user = api_user
