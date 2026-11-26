@@ -325,11 +325,12 @@ class RequestDoiStatusHelpersTest(RelationTaskTestCase):
             '10.1590/b: Relation target not found',
             body)
 
-    def test_batch_feedback_without_records_raises(self):
+    def test_batch_feedback_without_records_is_unknown(self):
         xml_doc = etree.fromstring(
             '<doi_batch_diagnostic status="completed"/>').getroottree()
-        with self.assertRaises(ValueError):
-            celery.batch_feedback(xml_doc)
+        status, body = celery.batch_feedback(xml_doc)
+        self.assertEqual('unknow', status)
+        self.assertEqual('', body)
 
     def test_register_expenses_is_idempotent(self):
         add_deposit(
