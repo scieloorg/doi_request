@@ -6,7 +6,7 @@ from io import BytesIO
 from lxml import etree
 
 from crossref import relations
-from tasks import celery
+from tasks.xml import get_doi_batch_id, serialize_xml, xml_is_valid
 
 
 FIXTURES_DIR = os.path.join(os.path.dirname(__file__), 'fixtures')
@@ -24,8 +24,8 @@ def load_xml_doc():
 
 
 def assert_valid(test_case, xml_doc):
-    is_valid, _, error = celery.xml_is_valid(
-        celery.serialize_xml(xml_doc), '10.1590/original',
+    is_valid, _, error = xml_is_valid(
+        serialize_xml(xml_doc), '10.1590/original',
         depositor_name='Test Depositor',
         depositor_email='depositor@example.org')
     test_case.assertTrue(is_valid, error)
@@ -124,7 +124,7 @@ class BatchHeadTest(unittest.TestCase):
         moment = datetime(2026, 11, 18, 17, 30, 5, 123456)
         xml_doc = relations.set_batch_head(load_xml_doc(), moment)
 
-        self.assertEqual('test-batch-relations', celery.get_doi_batch_id(xml_doc))
+        self.assertEqual('test-batch-relations', get_doi_batch_id(xml_doc))
         self.assertEqual('20261118173005123', xml_doc.findtext('.//cr:timestamp', namespaces=NS))
         assert_valid(self, xml_doc)
 
