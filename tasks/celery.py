@@ -331,7 +331,7 @@ def register_doi(self, code):
                 logger.error(log_title)
                 now = datetime.now()
                 deposit.submission_log = log_title
-                deposit.submission_status = 'waiting'
+                deposit.submission_status = 'error'
                 deposit.submission_updated_at = now
                 deposit.updated_at = now
 
@@ -445,7 +445,7 @@ def request_doi_status(self, code):
                 deposit.feedback_updated_at = now
                 deposit.updated_at = now
 
-                log_event(session, {'title': log_title, 'type': 'feedback', 'status': 'info', 'deposit_code': code})
+                log_event(session, {'title': log_title, 'body': doi_batch_status or '', 'type': 'feedback', 'status': 'info', 'deposit_code': code})
                 exc_class, exc_log_title = (UnkownSubmission, log_title)
 
             else:
