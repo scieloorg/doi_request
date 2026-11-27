@@ -24,6 +24,8 @@ As seguintes variáveis devem ser configuradas:
 - `CROSSREF_DEPOSITOR_EMAIL` - E-mail utilizado pelo depositor do DOI no Crossref;
 - `CROSSREF_DEPOSITOR_NAME` - Nome utilizado pelo depositor do DOI no Crossref;
 - `CROSSREF_PREFIX` - Prefixo utilizado pelo depositor do DOI no Crossref (ex: a SciELO utiliza o `10.1590`);
+- `CROSSREF_DEPOSIT_URL` - Opcional. Endereço base do depósito e do status dos lotes (padrão `https://doi.crossref.org`);
+- `CROSSREF_API_URL` - Opcional. Endereço base da REST API do Crossref (padrão `https://api.crossref.org`);
 - `SQL_ENGINE` - URI utilizada para conectar ao Banco de dados (PostgreSQL) (ex: `postgresql://usuario:senha@db:5432/banco_de_dados`);
 - `LOGGING_LEVEL` - Nível de log utilizado pela aplicação;
 

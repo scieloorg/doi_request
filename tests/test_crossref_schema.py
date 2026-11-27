@@ -1,7 +1,13 @@
 import os
 import unittest
 
-from tasks import celery
+from tasks.xml import (
+    CROSSREF_XSD_PATH,
+    PARSED_SCHEMA,
+    _crossref_tag,
+    get_doi_batch_id,
+    xml_is_valid,
+)
 
 
 FIXTURES_DIR = os.path.join(os.path.dirname(__file__), 'fixtures')
@@ -16,7 +22,7 @@ def load_fixture(name):
 
 
 def validate(xml, only_front=False):
-    return celery.xml_is_valid(
+    return xml_is_valid(
         xml,
         TEST_DOI,
         only_front=only_front,
@@ -28,9 +34,9 @@ def validate(xml, only_front=False):
 class CrossrefSchemaTest(unittest.TestCase):
 
     def test_compiles_crossref_5_5_as_xsd_1_1(self):
-        self.assertEqual('XMLSchema11', celery.PARSED_SCHEMA.__class__.__name__)
+        self.assertEqual('XMLSchema11', PARSED_SCHEMA.__class__.__name__)
         self.assertTrue(
-            celery.CROSSREF_XSD_PATH.endswith('crossref5.5.0.xsd')
+            CROSSREF_XSD_PATH.endswith('crossref5.5.0.xsd')
         )
 
     def test_accepts_crossref_5_5_with_references(self):
@@ -58,32 +64,32 @@ class CrossrefSchemaTest(unittest.TestCase):
         self.assertEqual(
             TEST_DEPOSITOR_NAME,
             xml_doc.find(
-                './/' + celery._crossref_tag('registrant')
+                './/' + _crossref_tag('registrant')
             ).text
         )
         self.assertEqual(
             TEST_DEPOSITOR_NAME,
             xml_doc.find(
-                './/' + celery._crossref_tag('depositor_name')
+                './/' + _crossref_tag('depositor_name')
             ).text
         )
         self.assertEqual(
             TEST_DEPOSITOR_EMAIL,
             xml_doc.find(
-                './/' + celery._crossref_tag('email_address')
+                './/' + _crossref_tag('email_address')
             ).text
         )
         self.assertEqual(
             TEST_DOI,
             xml_doc.find(
                 './/%s/%s' % (
-                    celery._crossref_tag('doi_data'),
-                    celery._crossref_tag('doi')
+                    _crossref_tag('doi_data'),
+                    _crossref_tag('doi')
                 )
             ).text
         )
         self.assertEqual(
-            'test-batch-no-refs', celery.get_doi_batch_id(xml_doc)
+            'test-batch-no-refs', get_doi_batch_id(xml_doc)
         )
 
     def test_removes_invalid_references_before_revalidating(self):
@@ -97,7 +103,7 @@ class CrossrefSchemaTest(unittest.TestCase):
         is_valid, xml_doc, error = validate(xml, only_front=True)
         self.assertTrue(is_valid, error)
         self.assertIsNone(
-            xml_doc.find('.//' + celery._crossref_tag('citation_list'))
+            xml_doc.find('.//' + _crossref_tag('citation_list'))
         )
 
     def test_rejects_crossref_4_4_namespace(self):

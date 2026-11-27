@@ -11,6 +11,7 @@ FEEDBACK_STATUS_TO_TEMPLATE = {
 
 SUBMISSION_STATUS_TO_TEMPLATE = {
     'waiting': ('warning', 'orange', 'fa-minus'),
+    'blocked': ('warning', 'orange', 'fa-lock'),
     'error': ('danger', 'red', 'fa-close'),
     'success': ('success', 'green', 'fa-check'),
     'unknow': ('default', 'gray', 'fa-info'),
